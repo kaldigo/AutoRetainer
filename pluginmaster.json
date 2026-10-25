@@ -3,7 +3,7 @@
     "Author": "NightmareXIV, kawaii",
     "Name": "AutoRetainer",
     "InternalName": "AutoRetainer",
-    "AssemblyVersion": "4.6.3.1",
+    "AssemblyVersion": "4.6.3.2",
     "Description": "Collect and assign ventures to your retainers from the comfort of your bed.",
     "ApplicableVersion": "any",
     "RepoUrl": "https://github.com/kaldigo/AutoRetainer",
@@ -15,9 +15,9 @@
     "IconUrl": "https://raw.githubusercontent.com/kaldigo/AutoRetainer/master/assets/icon.png",
     "Punchline": "Collect and assign ventures to your retainers from the comfort of your bed.",
     "AcceptsFeedback": true,
-    "Changelog": "Initial Steward integration preview. Collection references, exclusions, sale rules, live policy gates, retainer withdrawals, market listing/repricing and dresser actions. AutoRetainer identity and existing workflows are preserved. Starts in dry run. Native game acceptance remains pending.",
-    "DownloadLinkInstall": "https://github.com/kaldigo/AutoRetainer/releases/download/v4.6.3.1/AutoRetainer.zip",
-    "DownloadLinkUpdate": "https://github.com/kaldigo/AutoRetainer/releases/download/v4.6.3.1/AutoRetainer.zip",
-    "DownloadLinkTesting": "https://github.com/kaldigo/AutoRetainer/releases/download/v4.6.3.1/AutoRetainer.zip"
+    "Changelog": "Safety audit: protocol-2 owned handoffs with lease recovery; final GC/desynthesis confirmation checks; quick-sell and low-level vendor gates; managed discard scheduling/confirmation blocked; managed bulk outfit storage held because its IPC cannot provide per-item submission checks. Original identity and unmanaged workflows remain. New production confirmation/lease tests and expanded integration contracts. Native game acceptance remains pending; update Steward together.",
+    "DownloadLinkInstall": "https://github.com/kaldigo/AutoRetainer/releases/download/v4.6.3.2/AutoRetainer.zip",
+    "DownloadLinkUpdate": "https://github.com/kaldigo/AutoRetainer/releases/download/v4.6.3.2/AutoRetainer.zip",
+    "DownloadLinkTesting": "https://github.com/kaldigo/AutoRetainer/releases/download/v4.6.3.2/AutoRetainer.zip"
   }
 ]
