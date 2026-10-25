@@ -61,7 +61,9 @@ internal unsafe class Memory : IDisposable
         {
             e.Log();
         }
-        RetainerItemCommandHook.Original(AgentRetainerItemCommandModule, slot, inventoryType, a4, command);
+        if(command==RetainerItemCommand.HaveRetainerSellItem)
+            CompanionPolicy.SubmitSlot("Vendor",inventoryType,(int)slot,()=>RetainerItemCommandHook.Original(AgentRetainerItemCommandModule,slot,inventoryType,a4,command));
+        else RetainerItemCommandHook.Original(AgentRetainerItemCommandModule, slot, inventoryType, a4, command);
     }
 
     private delegate nint ReceiveRetainerVentureListUpdateDelegate(nint a1, int a2, nint a3);
@@ -131,7 +133,7 @@ internal unsafe class Memory : IDisposable
             if(slotPtr->ItemId != 0)
             {
                 if(Data.GetIMSettings().IMProtectList.Contains(slotPtr->ItemId)) throw new InvalidOperationException($"Attempted to sell protected item: {ExcelItemHelper.GetName(slotPtr->ItemId)}");
-                SellItemDetour((uint)slot, type, 0);
+                CompanionPolicy.SubmitSlot("Vendor",type,slot,()=>SellItemDetour((uint)slot,type,0));
             }
             else
             {

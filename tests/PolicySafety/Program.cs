@@ -82,3 +82,50 @@ Check(!identity.Matches(new(42,1,0,4,0)),"Changed selected slot is blocked");
 Check(!identity.Matches(new(42,1,0,3,1)),"Changed selected quality/flags are blocked");
 Check(!new PolicyItemIdentity(0,1,0,3,0).Matches(new(0,1,0,3,0)),"Empty selected identity never authorizes destruction");
 Console.WriteLine($"{total} safety checks passed including recovery persistence and desynthesis target binding.");
+var order=new List<string>();var nativeCalls=0;var held=0;
+Check(PolicyPersistence.Submit(()=>order.Add("journal"),()=>{order.Add("identity");return true;},()=>{order.Add("native");nativeCalls++;},_=>held++),"Valid submission runs");
+Check(order.SequenceEqual(new[]{"journal","identity","native"})&&nativeCalls==1&&held==0,"Persistence and final identity precede the native call");
+Check(!PolicyPersistence.Submit(()=>throw new System.IO.IOException("disk"),()=>true,()=>nativeCalls++,_=>held++),"Failed journal save holds");
+Check(nativeCalls==1&&held==1,"No native action after journal save failure");
+Check(!PolicyPersistence.Submit(()=>{},()=>false,()=>nativeCalls++,_=>held++),"Changed source after persistence holds");
+Check(nativeCalls==1&&held==2,"No native action after final source mismatch");
+Check(!PolicyPersistence.Submit(()=>{},()=>true,()=>throw new Exception("native"),_=>held++),"Native submission failure holds");
+Check(held==3,"Possible partial native action is escalated for review");
+for(uint quantity=1;quantity<=5;quantity++)
+for(uint removed=1;removed<=quantity;removed++)
+{
+    var expected=new PolicyItemIdentity(42,quantity,0,3,0);
+    var afterSource=quantity==removed?new PolicyItemIdentity(0,0,0,3,0):expected with{Quantity=quantity-removed};
+    Check(PolicySlotAcknowledgement.Check(expected,afterSource,quantity+4,quantity+4-removed,removed,false,1000,1001)==PolicyAck.Completed,"Exact source and total reduction acknowledge once");
+    Check(PolicySlotAcknowledgement.Check(expected,expected,quantity+4,quantity+4,removed,false,1000,1001)==PolicyAck.Waiting,"Unchanged inventory waits without retrying");
+    Check(PolicySlotAcknowledgement.Check(expected,afterSource,quantity+4,quantity+4-removed,removed,true,1000,1001)==PolicyAck.Waiting,"Busy native action or missing cabinet ownership waits");
+    Check(PolicySlotAcknowledgement.Check(expected,afterSource,quantity+4,quantity+3-removed,removed,false,1000,1001)==PolicyAck.Failed,"Unexpected total loss fails");
+    Check(PolicySlotAcknowledgement.Check(expected,afterSource with{Slot=4},quantity+4,quantity+4-removed,removed,false,1000,1001)==PolicyAck.Failed,"Another slot cannot acknowledge this source");
+    Check(PolicySlotAcknowledgement.Check(expected,null,quantity+4,null,removed,false,1000,1001)==PolicyAck.Failed,"Unavailable source and inventory cannot acknowledge");
+    Check(PolicySlotAcknowledgement.Check(expected,afterSource,quantity+4,quantity+4-removed,removed,false,1000,11001)==PolicyAck.Failed,"Expired submission stays for review even after late inventory change");
+}
+Check(PolicySlotAcknowledgement.Check(identity,identity,1,1,0,false,1000,1001)==PolicyAck.Failed,"Zero expected removal is invalid");
+Console.WriteLine($"{total} safety checks passed including durable submissions and source acknowledgements.");
+var folder=Path.Combine(Path.GetTempPath(),"ar-policy-safety-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(folder);
+var statePath=Path.Combine(folder,"state.json");
+try
+{
+    var state=new PolicyLedger{Owners=new(){{12,"Steward.InventoryPolicy.Evaluate"}},Pending=[12]};
+    AtomicState.Write(statePath,state);
+    var restored=AtomicState.ReadOrMigrate<PolicyLedger>(statePath,()=>throw new Exception("Incorrect migration"));restored.Validate();
+    Check(restored.Owners.ContainsKey(12)&&restored.Pending.Contains(12),"Real filesystem reload retains management and an unacknowledged submission");
+    restored.Pending.Clear();restored.Owners.Clear();AtomicState.Write(statePath,restored);
+    Check(AtomicState.ReadOrMigrate<PolicyLedger>(statePath,()=>throw new Exception()).Owners.Count==0,"Explicit persisted detach remains detached after reload");
+    File.WriteAllText(statePath,"{}");
+    try{AtomicState.ReadOrMigrate(statePath,()=>new PolicyLedger());throw new Exception("Incomplete ledger accepted");}
+    catch(System.Text.Json.JsonException){Check(true,"Missing ledger fields cannot silently erase managed owners");}
+    File.WriteAllText(statePath,"{");
+    try{AtomicState.ReadOrMigrate(statePath,()=>new PolicyLedger());throw new Exception("Corrupt ledger accepted");}
+    catch(System.Text.Json.JsonException){Check(true,"Corrupt safety ledger cannot fall back to unmanaged configuration");}
+    var blocked=Path.Combine(folder,"blocked");Directory.CreateDirectory(blocked);
+    try{AtomicState.Write(blocked,state);throw new Exception("Filesystem error swallowed");}
+    catch(Exception ex) when(ex is IOException or UnauthorizedAccessException){Check(true,"Actual write/replace failure reaches the pre-submit guard");}
+    Check(Directory.GetFiles(folder,"*.tmp").Length==0,"Failed native ledger write cleans up only its own temporary file");
+}
+finally{foreach(var file in Directory.GetFiles(folder))File.Delete(file);Directory.Delete(Path.Combine(folder,"blocked"));Directory.Delete(folder);}
+Console.WriteLine($"{total} safety checks passed including real ledger I/O and reload failures.");

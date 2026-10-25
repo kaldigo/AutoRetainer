@@ -4,22 +4,31 @@ using FFXIVClientStructs.FFXIV.Client.Game;
 namespace AutoRetainer.Modules;
 
 /// <summary>Optional, character-scoped policy. All game actions remain owned by AutoRetainer.</summary>
-internal static class CompanionPolicy
+internal static partial class CompanionPolicy
 {
-    internal const int Version = 4;
+    internal const int Version = 5;
     private static string callback;
     private static ulong character;
     private static long heartbeat;
     private static ulong handoffCharacter;
     private static readonly PolicyControl control=new();
+    private static PolicyLedger ledger=new();
+    private static bool ready;
+    internal static bool StartupBlocked=>!ready;
     internal static bool ControlActive => control.Active;
     internal static string Status = "No companion connected";
-    internal static bool IsManaged => C.CompanionPolicyOwners.ContainsKey(Svc.ClientState.LocalContentId);
-    internal static bool HasFault => IsManaged && C.CompanionPolicyFaults.Contains(Svc.ClientState.LocalContentId);
+    internal static bool IsManaged => ledger.Owners.ContainsKey(Svc.ClientState.LocalContentId);
+    internal static bool HasFault => IsManaged && ledger.Faults.Contains(Svc.ClientState.LocalContentId);
 
     internal static void Init()
     {
-        C.CompanionPolicyFaults.UnionWith(C.CompanionPolicyPending);
+        var migrated=false;
+        var saved=AtomicState.ReadOrMigrate(PolicyPath,()=>{migrated=true;return new PolicyLedger{Owners=new(C.CompanionPolicyOwners),Faults=new(C.CompanionPolicyFaults),Pending=new(C.CompanionPolicyPending)};});
+        saved.Validate();
+        ledger=saved;
+        ledger.Faults.UnionWith(ledger.Pending);
+        if(!migrated || ledger.Owners.Count!=0 || ledger.Faults.Count!=0 || ledger.Pending.Count!=0)SavePolicy();
+        ready=true;
         Svc.Framework.Update+=Tick;
         Svc.PluginInterface.GetIpcProvider<int>("AutoRetainer.InventoryPolicy.Version").RegisterFunc(() => Version);
         Svc.PluginInterface.GetIpcProvider<ulong, string, bool>("AutoRetainer.InventoryPolicy.Connect").RegisterFunc(Connect);
@@ -33,17 +42,21 @@ internal static class CompanionPolicy
         Svc.PluginInterface.GetIpcProvider<ulong, bool>("AutoRetainer.InventoryPolicy.AcquireControl").RegisterFunc(AcquireControl);
         Svc.PluginInterface.GetIpcProvider<ulong, bool>("AutoRetainer.InventoryPolicy.ReleaseControl").RegisterFunc(control.Release);
         Svc.PluginInterface.GetIpcProvider<ulong, bool>("AutoRetainer.InventoryPolicy.OwnsControl").RegisterFunc(OwnsControl);
-        Svc.PluginInterface.GetIpcProvider<ulong, bool>("AutoRetainer.InventoryPolicy.HasFault").RegisterFunc(cid=>C.CompanionPolicyOwners.ContainsKey(cid)&&C.CompanionPolicyFaults.Contains(cid));
+        Svc.PluginInterface.GetIpcProvider<ulong, bool>("AutoRetainer.InventoryPolicy.HasFault").RegisterFunc(cid=>ledger.Owners.ContainsKey(cid)&&ledger.Faults.Contains(cid));
         Svc.PluginInterface.GetIpcProvider<ulong, bool>("AutoRetainer.InventoryPolicy.ClearFault").RegisterFunc(ClearFault);
         Svc.PluginInterface.GetIpcProvider<ulong,string,object>("AutoRetainer.InventoryPolicy.Hold").RegisterAction((cid,reason)=>{if(Connected(cid))ReportFault(reason,false);});
     }
+    private static string PolicyPath=>System.IO.Path.Combine(Svc.PluginInterface.GetPluginConfigDirectory(),"steward-policy.json");
+    private static PolicyLedger CapturePolicy()=>new(){Owners=new(ledger.Owners),Faults=new(ledger.Faults),Pending=new(ledger.Pending)};
+    private static void SavePolicy()=>AtomicState.Write(PolicyPath,CapturePolicy());
 
     internal static void ReportFault(string reason,bool notify=true)
     {
+        if(!ready)return;
         if(!IsManaged)return;
         var cid=Svc.ClientState.LocalContentId;
-        if(C.CompanionPolicyFaults.Add(cid))
-            try{ECommons.Configuration.EzConfig.Save();}catch(Exception ex){Svc.Log.Error(ex,"Could not persist companion review hold");}
+        if(ledger.Faults.Add(cid))
+            try{SavePolicy();}catch(Exception ex){Svc.Log.Error(ex,"Could not persist companion review hold");}
         Status="Managed item actions held for review: "+reason;
         try{MaintainPauses();}catch(Exception ex){Svc.Log.Error(ex,"Could not maintain dialog pauses; item actions remain held");}
         if(!notify)return;
@@ -52,24 +65,24 @@ internal static class CompanionPolicy
     }
     internal static void BeginTransaction()
     {
-        C.CompanionPolicyPending.Add(Svc.ClientState.LocalContentId);
-        ECommons.Configuration.EzConfig.Save(); // Must succeed before the native commit.
+        ledger.Pending.Add(Svc.ClientState.LocalContentId);
+        SavePolicy(); // Must succeed before the native commit.
     }
     internal static void CompleteTransaction()
     {
         var cid=Svc.ClientState.LocalContentId;
-        var pending=C.CompanionPolicyPending.Contains(cid);
-        PolicyPersistence.Relax(()=>C.CompanionPolicyPending.Remove(cid),()=>ECommons.Configuration.EzConfig.Save(),
-            ()=>{if(pending)C.CompanionPolicyPending.Add(cid);});
+        var pending=ledger.Pending.Contains(cid);
+        PolicyPersistence.Relax(()=>ledger.Pending.Remove(cid),()=>SavePolicy(),
+            ()=>{if(pending)ledger.Pending.Add(cid);});
     }
     private static unsafe bool ClearFault(ulong cid)
     {
-        if(!Connected(cid) || ControlActive || SchedulerMain.RetainerPostProcessLocked)return false;
-        if(C.CompanionPolicyPending.Contains(cid) && !C.CompanionPolicyFaults.Contains(cid))return false;
-        foreach(var name in new[]{"SelectYesno","GrandCompanySupplyReward"})
+        if(!Connected(cid) || ControlActive || SchedulerMain.RetainerPostProcessLocked || P.TaskManager.IsBusy || AutoGCHandin.Operation)return false;
+        if(ledger.Pending.Contains(cid) && !ledger.Faults.Contains(cid))return false;
+        foreach(var name in new[]{"SelectYesno","GrandCompanySupplyReward","RetainerSell","MiragePrismMiragePrismSetConvert","MiragePrismPrismSetConvert"})
             if(TryGetAddonByName<FFXIVClientStructs.FFXIV.Component.GUI.AtkUnitBase>(name,out var addon) && addon->IsVisible)return false;
-        PolicyPersistence.ClearReview(C.CompanionPolicyFaults,C.CompanionPolicyPending,cid,
-            ()=>ECommons.Configuration.EzConfig.Save(),AutoGCHandin.ClearCompanionTransaction);
+        PolicyPersistence.ClearReview(ledger.Faults,ledger.Pending,cid,
+            ()=>SavePolicy(),()=>{AutoGCHandin.ClearCompanionTransaction();submission=null;});
         return true;
     }
 
@@ -77,7 +90,7 @@ internal static class CompanionPolicy
         callback,heartbeat,Environment.TickCount64,true);
     private static bool AcquireControl(ulong cid)
     {
-        return control.Acquire(cid,Connected(cid)&&!HasFault&&!C.CompanionPolicyPending.Contains(cid),Utils.IsBusy,IPC.Suppressed,MaintainPauses);
+        return control.Acquire(cid,Connected(cid)&&!HasFault&&!ledger.Pending.Contains(cid),Utils.IsBusy,IPC.Suppressed,MaintainPauses);
     }
     internal static void MaintainPauses()
     {
@@ -92,8 +105,10 @@ internal static class CompanionPolicy
         Svc.ClientState.LocalContentId,callback,heartbeat,Environment.TickCount64,SchedulerMain.RetainerPostProcessLocked);
     private static void Tick(Dalamud.Plugin.Services.IFramework _)
     {
-        foreach(var cid in C.CompanionPolicyPending.Where(id=>id!=Svc.ClientState.LocalContentId).ToArray())
-            if(C.CompanionPolicyFaults.Add(cid))try{ECommons.Configuration.EzConfig.Save();}catch(Exception ex){Svc.Log.Error(ex,"Could not persist interrupted transaction hold");}
+        CheckSubmission();
+        foreach(var cid in ledger.Pending.Where(id=>id!=Svc.ClientState.LocalContentId).ToArray())
+            if(ledger.Faults.Add(cid))try{SavePolicy();}catch(Exception ex){Svc.Log.Error(ex,"Could not persist interrupted transaction hold");}
+        if(submission!=null && submission.Character!=Svc.ClientState.LocalContentId)submission=null;
         if(control.Active && !OwnsControl(control.Owner))control.Release(control.Owner);
         if(handoffCharacter!=0 && !OwnsHandoff(handoffCharacter))
         {
@@ -106,8 +121,10 @@ internal static class CompanionPolicy
     private static bool Connect(ulong cid, string endpoint)
     {
         if(cid == 0 || cid != Svc.ClientState.LocalContentId || endpoint != "Steward.InventoryPolicy.Evaluate") return false;
-        if(C.CompanionPolicyOwners.TryGetValue(cid, out var existing) && existing != endpoint) return false;
-        if(!C.CompanionPolicyOwners.ContainsKey(cid)) { C.CompanionPolicyOwners[cid] = endpoint; ECommons.Configuration.EzConfig.Save(); }
+        if(ledger.Owners.TryGetValue(cid, out var existing) && existing != endpoint) return false;
+        ledger.Owners[cid]=endpoint;
+        // A previous failed save may have left only an in-memory owner. Every connection must persist before activating.
+        SavePolicy();
         character = cid;
         callback = endpoint;
         heartbeat = Environment.TickCount64;
@@ -124,9 +141,11 @@ internal static class CompanionPolicy
 
     private static bool Detach(ulong cid, string endpoint)
     {
-        if(cid != Svc.ClientState.LocalContentId || !C.CompanionPolicyOwners.TryGetValue(cid, out var owner) || owner != endpoint) return false;
-        PolicyPersistence.Relax(()=>C.CompanionPolicyOwners.Remove(cid),()=>ECommons.Configuration.EzConfig.Save(),
-            ()=>C.CompanionPolicyOwners[cid]=owner);
+        if(cid != Svc.ClientState.LocalContentId || !ledger.Owners.TryGetValue(cid, out var owner) || owner != endpoint) return false;
+        if(ControlActive || SchedulerMain.RetainerPostProcessLocked || P.TaskManager.IsBusy || AutoGCHandin.Operation ||
+            ledger.Pending.Contains(cid) || ledger.Faults.Contains(cid))return false;
+        PolicyPersistence.Relax(()=>ledger.Owners.Remove(cid),()=>SavePolicy(),
+            ()=>ledger.Owners[cid]=owner);
         character = 0;
         callback = null;
         Status = "Companion detached; original AutoRetainer rules apply";
@@ -134,13 +153,13 @@ internal static class CompanionPolicy
     }
 
     /// <summary>Checked at both candidate selection and submission. Explicit upstream protections win.</summary>
-    internal static bool Allows(string action, uint itemId, uint quantity = 1, int container = -1, int slot = -1)
+    internal static bool Allows(string action, uint itemId, uint quantity = 1, int container = -1, int slot = -1,bool ownSubmission=false)
     {
-        if(ControlActive || HasFault)return false;
+        if(!ready || ControlActive || HasFault || submission!=null&&!ownSubmission)return false;
         var cid = Svc.ClientState.LocalContentId;
         if(cid == 0) return false;
-        if(!C.CompanionPolicyOwners.TryGetValue(cid, out var owner)) return true;
-        if(C.CompanionPolicyPending.Contains(cid) && action!="Gc")return false;
+        if(!ledger.Owners.TryGetValue(cid, out var owner)) return true;
+        if(ledger.Pending.Contains(cid) && action!="Gc" && !ownSubmission)return false;
         if(character != cid || callback != owner || Environment.TickCount64 - heartbeat > 5000)
         {
             Status = "Managed item actions paused: companion unavailable";
@@ -151,7 +170,7 @@ internal static class CompanionPolicy
             var request = JsonConvert.SerializeObject(new { Version, Character = cid, Action = action, ItemId = itemId, Quantity = quantity, Container = container, Slot = slot });
             var result = Svc.PluginInterface.GetIpcSubscriber<string, string>(callback).InvokeFunc(request);
             // Only an explicit allow authorizes an action. Invalid/unknown responses hold the item.
-            return result == "Allow";
+            return result == "Allow" && Connected(cid) && callback==owner && IsManaged && !HasFault && !ControlActive;
         }
         catch(Exception ex)
         {
@@ -161,7 +180,7 @@ internal static class CompanionPolicy
         }
     }
 
-    internal static unsafe bool AllowsSlot(string action, InventoryType container, int slot)
+    internal static unsafe bool AllowsSlot(string action, InventoryType container, int slot,bool ownSubmission=false)
     {
         var manager = InventoryManager.Instance();
         if(manager == null) return false;
@@ -171,7 +190,7 @@ internal static class CompanionPolicy
         if(item==null || item->ItemId==0 || item->Quantity<=0)return false;
         var expected=new PolicyItemIdentity(item->ItemId,(uint)item->Quantity,(uint)container,slot,(int)item->Flags);
         if(Data.GetIMSettings().IMProtectList.Contains(expected.ItemId))return false;
-        if(!Allows(action,expected.ItemId,expected.Quantity,(int)container,slot))return false;
+        if(!Allows(action,expected.ItemId,expected.Quantity,(int)container,slot,ownSubmission))return false;
         inv=manager->GetInventoryContainer(container);
         if(inv==null || !inv->IsLoaded || slot>=inv->Size)return false;
         item=inv->GetInventorySlot(slot);
@@ -181,7 +200,7 @@ internal static class CompanionPolicy
 
     private static bool Run(ulong cid, string operation)
     {
-        if(!Connected(cid) || HasFault || C.CompanionPolicyPending.Contains(cid) || Utils.IsBusy) return false;
+        if(!Connected(cid) || HasFault || ledger.Pending.Contains(cid) || Utils.IsBusy) return false;
         switch(operation)
         {
             case "Armoire": S.CabinetManager.EnqueueGoToInnAndDeliverEverything(); return true;
@@ -221,12 +240,16 @@ internal static class CompanionPolicy
         if(!OwnsHandoff(cid)) return false;
         var expected=JsonConvert.DeserializeObject<Retrieval>(request);
         if(expected==null || !Enum.IsDefined((InventoryType)expected.Container) || !Utils.RetainerInventories.Contains((InventoryType)expected.Container))return false;
+        var retainers=RetainerManager.Instance();
+        if(retainers==null || expected.Retainer==0 || retainers->LastSelectedRetainerId!=expected.Retainer)return false;
         var type=(InventoryType)expected.Container;
         var inv=InventoryManager.Instance()->GetInventoryContainer(type);
         if(inv==null||!inv->IsLoaded||expected.Slot<0||expected.Slot>=inv->Size)return false;
         var item=inv->GetInventorySlot(expected.Slot);
-        if(item->ItemId!=expected.ItemId || item->Quantity!=expected.Quantity || !AllowsSlot("Retrieve",type,expected.Slot))return false;
+        if(item==null || item->ItemId!=expected.ItemId || item->Quantity!=expected.Quantity ||
+            item->Flags.HasFlag(InventoryItem.ItemFlags.HighQuality)!=expected.Hq || !AllowsSlot("Retrieve",type,expected.Slot))return false;
         if(Utils.GetInventoryFreeSlotCount()<2)return false;
+        if(retainers->LastSelectedRetainerId!=expected.Retainer || !OwnsHandoff(cid))return false;
         P.Memory.RetainerItemCommandDetour(Internal.InventoryManagement.InventorySpaceManager.AgentRetainerItemCommandModule,(uint)expected.Slot,type,0,Internal.InventoryManagement.RetainerItemCommand.RetrieveFromRetainer);
         return true;
     }
@@ -237,11 +260,14 @@ internal static class CompanionPolicy
         public int Slot;
         public uint ItemId;
         public uint Quantity;
+        public bool Hq;
+        public ulong Retainer;
     }
 
     internal static unsafe bool AllowsDresserBatch()
     {
-        if(!C.CompanionPolicyOwners.ContainsKey(Svc.ClientState.LocalContentId)) return true;
+        if(!ready)return false;
+        if(!ledger.Owners.ContainsKey(Svc.ClientState.LocalContentId)) return true;
         // The bulk IPC has no final per-item policy callback, and can outlive the companion lease.
         Status = "Managed bulk dresser storage held: use individually validated transfers";
         return false;

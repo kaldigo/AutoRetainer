@@ -7,7 +7,7 @@ internal static class TextAdvanceManager
 {
     private static bool WasChanged = false;
 
-    private static bool IsBusy => CompanionPolicy.ControlActive || CompanionPolicy.HasFault || (Utils.IsBusy || VoyageScheduler.Enabled) && !SchedulerMain.CharacterPostProcessLocked;
+    private static bool IsBusy => CompanionPolicy.ControlActive || CompanionPolicy.HasFault || CompanionPolicy.SubmissionPending || (Utils.IsBusy || VoyageScheduler.Enabled) && !SchedulerMain.CharacterPostProcessLocked;
     internal static void Tick()
     {
         if(WasChanged)

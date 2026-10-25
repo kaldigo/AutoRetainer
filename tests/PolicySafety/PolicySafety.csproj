@@ -4,5 +4,7 @@
     <Compile Include="../../AutoRetainer/Modules/PolicyConfirmation.cs" Link="PolicyConfirmation.cs" />
     <Compile Include="../../AutoRetainer/Modules/PolicyControl.cs" Link="PolicyControl.cs" />
     <Compile Include="../../AutoRetainer/Modules/PolicyPersistence.cs" Link="PolicyPersistence.cs" />
+    <Compile Include="../../AutoRetainer/Modules/AtomicState.cs" Link="AtomicState.cs" />
+    <Compile Include="../../AutoRetainer/Modules/PolicyLedger.cs" Link="PolicyLedger.cs" />
   </ItemGroup>
 </Project>

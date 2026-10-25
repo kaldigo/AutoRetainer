@@ -13,8 +13,8 @@ class IntegrationContract(unittest.TestCase):
    with self.subTest(path=path):self.assertIn(guard,(ROOT/'AutoRetainer'/path).read_text())
  def test_opt_in_and_unavailable_provider_holds(self):
   text=(ROOT/'AutoRetainer/Modules/CompanionPolicy.cs').read_text()
-  self.assertIn('if(!C.CompanionPolicyOwners.TryGetValue(cid, out var owner)) return true;',text)
-  self.assertIn('return result == "Allow";',text)
+  self.assertIn('if(!ledger.Owners.TryGetValue(cid, out var owner)) return true;',text)
+  self.assertIn('return result == "Allow" && Connected(cid)',text)
   self.assertIn('Environment.TickCount64 - heartbeat > 5000',text)
   self.assertNotIn('WriteOfflineCharacterData',text)
  def test_storage_is_not_conflated_with_disposal(self):
@@ -48,7 +48,7 @@ class IntegrationContract(unittest.TestCase):
  def test_managed_bulk_cannot_outlive_per_item_policy(self):
   text=(ROOT/'AutoRetainer/Modules/CompanionPolicy.cs').read_text()
   body=text.split('internal static unsafe bool AllowsDresserBatch()')[1].split('internal static void Shutdown()')[0]
-  self.assertIn('if(!C.CompanionPolicyOwners.ContainsKey(Svc.ClientState.LocalContentId)) return true;',body)
+  self.assertIn('if(!ledger.Owners.ContainsKey(Svc.ClientState.LocalContentId)) return true;',body)
   self.assertIn('return false;',body)
   self.assertNotIn('AllowsSlot("Dresser"',body)
  def test_lease_watchdog_only_releases_its_recorded_handoff(self):
@@ -56,16 +56,16 @@ class IntegrationContract(unittest.TestCase):
   self.assertIn('handoffCharacter=plugin=="Steward"?Svc.ClientState.LocalContentId:0',text)
   self.assertIn('if(handoffCharacter!=0 && !OwnsHandoff(handoffCharacter))',text)
   self.assertEqual(text.count('if(!OwnsHandoff(cid)) return false;'),2)
-  self.assertIn('internal const int Version = 4;',text)
+  self.assertIn('internal const int Version = 5;',text)
   ipc=(ROOT/'AutoRetainer/Modules/IPC.cs').read_text()
   self.assertIn('CompanionPolicy.BeginHandoff(pluginName)',ipc)
   self.assertIn('CompanionPolicy.EndHandoff()',ipc)
  def test_standalone_control_is_owned_and_does_not_mutate_general_suppression(self):
   text=(ROOT/'AutoRetainer/Modules/CompanionPolicy.cs').read_text()
   self.assertIn('if(control.Active && !OwnsControl(control.Owner))control.Release(control.Owner);',text)
-  self.assertIn('if(ControlActive || HasFault)return false;',text)
+  self.assertIn('if(!ready || ControlActive || HasFault || submission!=null&&!ownSubmission)return false;',text)
   self.assertNotIn('IPC.Suppressed=',text)
-  self.assertIn('if(CompanionPolicy.ControlActive || CompanionPolicy.HasFault){CompanionPolicy.MaintainPauses();return;}',(ROOT/'AutoRetainer/AutoRetainer.cs').read_text(encoding='utf-8-sig'))
+  self.assertIn('if(CompanionPolicy.StartupBlocked || CompanionPolicy.ControlActive || CompanionPolicy.HasFault){CompanionPolicy.MaintainPauses();return;}',(ROOT/'AutoRetainer/AutoRetainer.cs').read_text(encoding='utf-8-sig'))
  def test_gc_hq_confirmation_is_owned(self):
   text=(ROOT/'AutoRetainer/Modules/GcHandin/AutoGCHandin.cs').read_text()
   self.assertIn('PolicyDialog.Matches(pendingRewardId,addon->ParentId,addon->HostId)',text)
@@ -78,8 +78,8 @@ class IntegrationContract(unittest.TestCase):
   self.assertLess(text.index('CompanionPolicy.BeginTransaction();'),text.index('new AddonMaster.GrandCompanySupplyReward(addon).Deliver()'))
   self.assertIn('CompanionPolicy.CompleteTransaction();',text)
   text=(ROOT/'AutoRetainer/Modules/CompanionPolicy.cs').read_text()
-  self.assertIn('C.CompanionPolicyFaults.Add(cid)',text)
-  self.assertIn('C.CompanionPolicyFaults.UnionWith(C.CompanionPolicyPending);',text)
+  self.assertIn('ledger.Faults.Add(cid)',text)
+  self.assertIn('ledger.Faults.UnionWith(ledger.Pending);',text)
   self.assertIn('Steward.InventoryPolicy.Fault',text)
   self.assertIn('addon->IsVisible)return false;',text)
  def test_existing_dialog_automation_is_paused_before_companion_work(self):
@@ -100,8 +100,47 @@ class IntegrationContract(unittest.TestCase):
  def test_native_desynthesis_target_and_post_callback_source_are_bound(self):
   source=(ROOT/'AutoRetainer/Scheduler/Tasks/TaskDesynthItems.cs').read_text()
   self.assertIn('var selected=agent->DesynthItemSlot;',source)
-  self.assertLess(source.index('expected.Matches(new(selected.ItemId'),source.index('agent->AgentInterface.ReceiveEvent'))
+  self.assertLess(source.index('expected.Matches(new(selected.ItemId'),source.index('->AgentInterface.ReceiveEvent'))
   source=(ROOT/'AutoRetainer/Modules/CompanionPolicy.cs').read_text()
   self.assertIn('expected.Matches(new(item->ItemId',source)
   self.assertIn('!Data.GetIMSettings().IMProtectList.Contains(expected.ItemId)',source)
+ def test_native_mutations_use_write_ahead_submission_and_acknowledgement(self):
+  source=(ROOT/'AutoRetainer/Modules/CompanionSubmission.cs').read_text()
+  self.assertIn('PolicyPersistence.Submit(()=>{MaintainPauses();BeginTransaction();}',source)
+  self.assertIn('AllowsSlot(action,type,slot,true)',source)
+  self.assertIn('PolicySlotAcknowledgement.Check(',source)
+  self.assertIn('if(result==PolicyAck.Completed){CompleteTransaction();submission=null;}',source)
+  memory=(ROOT/'AutoRetainer/Internal/Memory.cs').read_text()
+  self.assertEqual(memory.count('CompanionPolicy.SubmitSlot("Vendor"'),2)
+  self.assertIn('CompanionPolicy.SubmitSlot("Desynth"',(ROOT/'AutoRetainer/Scheduler/Tasks/TaskDesynthItems.cs').read_text())
+  self.assertIn('CompanionPolicy.SubmitArmoire(', (ROOT/'AutoRetainer/Services/CabinetManager.cs').read_text())
+ def test_recovery_and_detach_cannot_resume_backlogged_actions(self):
+  source=(ROOT/'AutoRetainer/Modules/CompanionPolicy.cs').read_text()
+  clear=source.split('private static unsafe bool ClearFault')[1].split('private static bool Connected')[0]
+  self.assertIn('P.TaskManager.IsBusy',clear)
+  detach=source.split('private static bool Detach')[1].split('/// <summary>')[0]
+  self.assertIn('ledger.Pending.Contains(cid)',detach)
+  self.assertIn('ledger.Faults.Contains(cid)',detach)
+ def test_pending_acknowledgement_waits_in_original_workflows(self):
+  for path in ['Internal/InventoryManagement/InventorySpaceManager.cs','Internal/InventoryManagement/NpcSaleManager.cs','Scheduler/Tasks/TaskDesynthItems.cs','Services/CabinetManager.cs']:
+   self.assertIn('if(CompanionPolicy.SubmissionPending)return false;',(ROOT/'AutoRetainer'/path).read_text())
+  source=(ROOT/'AutoRetainer/Modules/CompanionPolicy.cs').read_text()
+  self.assertIn('retainers->LastSelectedRetainerId!=expected.Retainer',source)
+  self.assertIn('InventoryItem.ItemFlags.HighQuality)!=expected.Hq',source)
+ def test_connection_retry_persists_even_an_existing_memory_owner(self):
+  source=(ROOT/'AutoRetainer/Modules/CompanionPolicy.cs').read_text()
+  connect=source.split('private static bool Connect(')[1].split('private static bool Pulse')[0]
+  self.assertNotIn('if(!ledger.Owners.ContainsKey(cid))',connect)
+  self.assertLess(connect.index('SavePolicy();'),connect.index('character = cid;'))
+ def test_safety_writes_do_not_use_exception_swallowing_config_helper(self):
+  source=(ROOT/'AutoRetainer/Modules/CompanionPolicy.cs').read_text()
+  self.assertNotIn('EzConfig.Save()',source)
+  self.assertIn('AtomicState.Write(PolicyPath,CapturePolicy())',source)
+  self.assertLess(source.index('saved.Validate();'),source.index('Svc.Framework.Update+=Tick'))
+ def test_ordinary_config_imports_cannot_erase_runtime_policy(self):
+  source=(ROOT/'AutoRetainer/Modules/CompanionPolicy.cs').read_text()
+  allows=source.split('internal static bool Allows(')[1].split('internal static unsafe bool AllowsSlot')[0]
+  self.assertIn('ledger.Owners.TryGetValue',allows)
+  self.assertNotIn('C.CompanionPolicy',allows)
+  self.assertIn('internal static bool StartupBlocked=>!ready;',source)
 if __name__=='__main__':unittest.main()

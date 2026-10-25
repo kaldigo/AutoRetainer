@@ -22,6 +22,7 @@ public static unsafe class TaskDesynthItems
 
     private static bool? RecursivelyDesynthItems()
     {
+        if(CompanionPolicy.SubmissionPending)return false;
         if(!QuestManager.IsQuestComplete(65688)) return true;
 
         var eligibleItems = GetDesynthesisEligibleItems();
@@ -79,11 +80,6 @@ public static unsafe class TaskDesynthItems
         var agent=AgentSalvage.Instance();
         if(agent==null)return;
         agent->SalvageItem(item);
-        var retval = new AtkValue();
-        Span<AtkValue> param = [
-            new AtkValue { Type = ValueType.Int, Int = 0 },
-            new AtkValue { Type = ValueType.Bool, Byte = 1 }
-        ];
         if(!expected.Matches(new(item->ItemId,(uint)item->Quantity,(uint)item->Container,item->Slot,(int)item->Flags)) ||
             !CompanionPolicy.AllowsSlot("Desynth", item->Container, item->Slot)) return;
         var selected=agent->DesynthItemSlot;
@@ -92,6 +88,17 @@ public static unsafe class TaskDesynthItems
             CompanionPolicy.ReportFault("Desynthesis selection changed before confirmation");
             return;
         }
-        agent->AgentInterface.ReceiveEvent(&retval, param.GetPointer(0), 2, 1);
+        // Stack values cannot be captured in a delegate. Recreate the same native parameters inside the guarded submission.
+        var address=(nint)agent;
+        CompanionPolicy.SubmitSlot("Desynth",item->Container,item->Slot,()=>ConfirmDesynth(address,expected),1);
+    }
+    private static void ConfirmDesynth(nint address,PolicyItemIdentity expected)
+    {
+        var selected=((AgentSalvage*)address)->DesynthItemSlot;
+        if(CompanionPolicy.IsManaged && !expected.Matches(new(selected.ItemId,(uint)selected.Quantity,(uint)selected.Container,selected.Slot,(int)selected.Flags)))
+            throw new InvalidOperationException("Desynthesis selection could not be verified at submission");
+        var retval=new AtkValue();
+        Span<AtkValue> param=[new AtkValue{Type=ValueType.Int,Int=0},new AtkValue{Type=ValueType.Bool,Byte=1}];
+        ((AgentSalvage*)address)->AgentInterface.ReceiveEvent(&retval,param.GetPointer(0),2,1);
     }
 }

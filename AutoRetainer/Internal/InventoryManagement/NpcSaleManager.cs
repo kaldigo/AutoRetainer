@@ -79,7 +79,7 @@ public static unsafe class NpcSaleManager
 
     public static bool? SellHardListItemsTask()
     {
-
+        if(CompanionPolicy.SubmissionPending)return false;
         if(!EzThrottler.Check("NpcInventoryTimeout") && Utils.GetCapturedInventoryState(InventorySpaceManager.GetAllowedToSellInventoryTypes()).SequenceEqual(CapturedInventoryState))
         {
             return false;

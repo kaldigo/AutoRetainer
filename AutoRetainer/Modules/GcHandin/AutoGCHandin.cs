@@ -45,7 +45,7 @@ internal static unsafe class AutoGCHandin
         quantity=0;loaded=false;
         var manager=InventoryManager.Instance();if(manager==null)return null;
         var copies=new List<string>();
-        foreach(var type in Utils.PlayerInventoryWithArmory)
+        foreach(var type in CompanionPolicy.PolicyPlayerInventories)
         {
             var container=manager->GetInventoryContainer(type);
             if(container==null || !container->IsLoaded)return null;

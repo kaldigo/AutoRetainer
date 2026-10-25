@@ -1273,7 +1273,7 @@ public static unsafe class Utils
     }
 
     internal static bool MultiModeOrArtisan => MultiMode.Active || (SchedulerMain.PluginEnabled && SchedulerMain.Reason == PluginEnableReason.Artisan);
-    internal static bool IsBusy => CompanionPolicy.ControlActive || P.TaskManager.IsBusy || AutoGCHandin.Operation || Lifestream.IsBusy();
+    internal static bool IsBusy => CompanionPolicy.ControlActive || CompanionPolicy.SubmissionPending || P.TaskManager.IsBusy || AutoGCHandin.Operation || Lifestream.IsBusy();
     internal static AtkValue ZeroAtkValue = new() { Type = 0, Int = 0 };
 
     internal static IEnumerable<string> GetEObjNames(params uint[] values)

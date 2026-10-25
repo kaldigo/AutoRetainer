@@ -160,10 +160,17 @@ public unsafe class CabinetManager : IDisposable
                         {
                             P.TaskManager.Insert(() =>
                             {
+                                if(CompanionPolicy.SubmissionPending)return false;
                                 var cabItem = Cabinet.Values.FirstOrNull(x => x.Item.RowId == id);
                                 if(cabItem != null && cabItem.Value.RowId != 0 && !UIState.Instance()->Cabinet.IsItemInCabinet(cabItem.Value.RowId) && TryGetAddonByName<AtkUnitBase>("Cabinet", out var addon) && addon->IsReady())
                                 {
                                     if(!CompanionPolicy.Allows("Armoire", id)) return true;
+                                    if(CompanionPolicy.IsManaged)
+                                    {
+                                        // One managed submission; the shared journal requires both source removal and cabinet ownership.
+                                        CompanionPolicy.SubmitArmoire(id,cabItem.Value.RowId,()=>UIState.Instance()->Cabinet.StoreCabinetItem(cabItem.Value.RowId));
+                                        return true;
+                                    }
                                     var result = UIState.Instance()->Cabinet.StoreCabinetItem(cabItem.Value.RowId);
                                     PluginLog.Debug($"Store cabinet item {ExcelItemHelper.GetName(cabItem.Value.Item.RowId, true)}, result={result}");
                                     if(EzThrottler.Check("StoreCabinet") && EzThrottler.Throttle($"StoreCabinet{cabItem}", 2000))
