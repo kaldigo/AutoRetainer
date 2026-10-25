@@ -3,7 +3,7 @@
     "Author": "NightmareXIV, kawaii",
     "Name": "AutoRetainer",
     "InternalName": "AutoRetainer",
-    "AssemblyVersion": "4.6.3.3",
+    "AssemblyVersion": "4.6.3.4",
     "Description": "Collect and assign ventures to your retainers from the comfort of your bed.",
     "ApplicableVersion": "any",
     "RepoUrl": "https://github.com/kaldigo/AutoRetainer",
@@ -16,8 +16,8 @@
     "Punchline": "Collect and assign ventures to your retainers from the comfort of your bed.",
     "AcceptsFeedback": true,
     "Changelog": "Second safety review: protocol-3 owned standalone control/expiry, no changes to general suppression, existing YesAlready/TextAdvance pause coordination, owned one-shot GC confirmations and bilateral persisted transaction-review holds. Existing protections, identity and unmanaged workflows remain. Expanded production control/dialog/commit tests pass. Native acceptance remains pending; update Steward together and keep automatic execution off.",
-    "DownloadLinkInstall": "https://github.com/kaldigo/AutoRetainer/releases/download/v4.6.3.3/AutoRetainer.zip",
-    "DownloadLinkUpdate": "https://github.com/kaldigo/AutoRetainer/releases/download/v4.6.3.3/AutoRetainer.zip",
-    "DownloadLinkTesting": "https://github.com/kaldigo/AutoRetainer/releases/download/v4.6.3.3/AutoRetainer.zip"
+    "DownloadLinkInstall": "https://github.com/kaldigo/AutoRetainer/releases/download/v4.6.3.4/AutoRetainer.zip",
+    "DownloadLinkUpdate": "https://github.com/kaldigo/AutoRetainer/releases/download/v4.6.3.4/AutoRetainer.zip",
+    "DownloadLinkTesting": "https://github.com/kaldigo/AutoRetainer/releases/download/v4.6.3.4/AutoRetainer.zip"
   }
 ]
