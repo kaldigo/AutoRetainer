@@ -74,8 +74,12 @@ class IntegrationContract(unittest.TestCase):
   self.assertLess(text.index('deliveryGate.Submitted'),text.index('new AddonMaster.GrandCompanySupplyReward(addon).Deliver()'))
   self.assertLess(text.index('hqGate.Submitted'),text.index('new AddonMaster.SelectYesno((IntPtr)addon).Yes()'))
   self.assertIn('CompanionPolicy.ReportFault(reason)',text)
+  self.assertIn('GC stopped before inventory acknowledgement',text)
+  self.assertLess(text.index('CompanionPolicy.BeginTransaction();'),text.index('new AddonMaster.GrandCompanySupplyReward(addon).Deliver()'))
+  self.assertIn('CompanionPolicy.CompleteTransaction();',text)
   text=(ROOT/'AutoRetainer/Modules/CompanionPolicy.cs').read_text()
   self.assertIn('C.CompanionPolicyFaults.Add(cid)',text)
+  self.assertIn('C.CompanionPolicyFaults.UnionWith(C.CompanionPolicyPending);',text)
   self.assertIn('Steward.InventoryPolicy.Fault',text)
   self.assertIn('addon->IsVisible)return false;',text)
  def test_existing_dialog_automation_is_paused_before_companion_work(self):

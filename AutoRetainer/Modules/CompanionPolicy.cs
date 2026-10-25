@@ -19,6 +19,7 @@ internal static class CompanionPolicy
 
     internal static void Init()
     {
+        C.CompanionPolicyFaults.UnionWith(C.CompanionPolicyPending);
         Svc.Framework.Update+=Tick;
         Svc.PluginInterface.GetIpcProvider<int>("AutoRetainer.InventoryPolicy.Version").RegisterFunc(() => Version);
         Svc.PluginInterface.GetIpcProvider<ulong, string, bool>("AutoRetainer.InventoryPolicy.Connect").RegisterFunc(Connect);
@@ -49,19 +50,29 @@ internal static class CompanionPolicy
         try{Svc.PluginInterface.GetIpcSubscriber<ulong,string,object>("Steward.InventoryPolicy.Fault").InvokeAction(cid,reason);}
         catch(Exception ex){Svc.Log.Debug(ex,Status);}
     }
+    internal static void BeginTransaction()
+    {
+        C.CompanionPolicyPending.Add(Svc.ClientState.LocalContentId);
+        ECommons.Configuration.EzConfig.Save(); // Must succeed before the native commit.
+    }
+    internal static void CompleteTransaction()
+    {
+        C.CompanionPolicyPending.Remove(Svc.ClientState.LocalContentId);
+        ECommons.Configuration.EzConfig.Save();
+    }
     private static unsafe bool ClearFault(ulong cid)
     {
         if(!Connected(cid) || ControlActive || SchedulerMain.RetainerPostProcessLocked)return false;
         foreach(var name in new[]{"SelectYesno","GrandCompanySupplyReward"})
             if(TryGetAddonByName<FFXIVClientStructs.FFXIV.Component.GUI.AtkUnitBase>(name,out var addon) && addon->IsVisible)return false;
-        C.CompanionPolicyFaults.Remove(cid);ECommons.Configuration.EzConfig.Save();return true;
+        C.CompanionPolicyFaults.Remove(cid);C.CompanionPolicyPending.Remove(cid);ECommons.Configuration.EzConfig.Save();return true;
     }
 
     private static bool Connected(ulong cid) => HandoffLease.Owns(cid,character,Svc.ClientState.LocalContentId,
         callback,heartbeat,Environment.TickCount64,true);
     private static bool AcquireControl(ulong cid)
     {
-        return control.Acquire(cid,Connected(cid)&&!HasFault,Utils.IsBusy,IPC.Suppressed,MaintainPauses);
+        return control.Acquire(cid,Connected(cid)&&!HasFault&&!C.CompanionPolicyPending.Contains(cid),Utils.IsBusy,IPC.Suppressed,MaintainPauses);
     }
     internal static void MaintainPauses()
     {
@@ -76,6 +87,8 @@ internal static class CompanionPolicy
         Svc.ClientState.LocalContentId,callback,heartbeat,Environment.TickCount64,SchedulerMain.RetainerPostProcessLocked);
     private static void Tick(Dalamud.Plugin.Services.IFramework _)
     {
+        foreach(var cid in C.CompanionPolicyPending.Where(id=>id!=Svc.ClientState.LocalContentId).ToArray())
+            if(C.CompanionPolicyFaults.Add(cid))try{ECommons.Configuration.EzConfig.Save();}catch(Exception ex){Svc.Log.Error(ex,"Could not persist interrupted transaction hold");}
         if(control.Active && !OwnsControl(control.Owner))control.Release(control.Owner);
         if(handoffCharacter!=0 && !OwnsHandoff(handoffCharacter))
         {
@@ -122,6 +135,7 @@ internal static class CompanionPolicy
         var cid = Svc.ClientState.LocalContentId;
         if(cid == 0) return false;
         if(!C.CompanionPolicyOwners.TryGetValue(cid, out var owner)) return true;
+        if(C.CompanionPolicyPending.Contains(cid) && action!="Gc")return false;
         if(character != cid || callback != owner || Environment.TickCount64 - heartbeat > 5000)
         {
             Status = "Managed item actions paused: companion unavailable";
@@ -154,7 +168,7 @@ internal static class CompanionPolicy
 
     private static bool Run(ulong cid, string operation)
     {
-        if(!Connected(cid) || HasFault || Utils.IsBusy) return false;
+        if(!Connected(cid) || HasFault || C.CompanionPolicyPending.Contains(cid) || Utils.IsBusy) return false;
         switch(operation)
         {
             case "Armoire": S.CabinetManager.EnqueueGoToInnAndDeliverEverything(); return true;

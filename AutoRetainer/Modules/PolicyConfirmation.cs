@@ -28,3 +28,15 @@ internal sealed class PolicyCommitGate
         Submitted=true;return true;
     }
 }
+
+internal enum PolicyAck { Waiting, Completed, Failed }
+internal static class PolicyAcknowledgement
+{
+    internal static PolicyAck Check(long before,long? current,bool dialogVisible,long submitted,long now)
+    {
+        if(before<=0 || current==null || now<submitted || now-submitted>10000)return PolicyAck.Failed;
+        if(current==before-1 && !dialogVisible)return PolicyAck.Completed;
+        if(current!=before && current!=before-1)return PolicyAck.Failed;
+        return PolicyAck.Waiting;
+    }
+}

@@ -10,6 +10,7 @@ internal unsafe class Config
 {
     public Dictionary<ulong, string> CompanionPolicyOwners = [];
     public HashSet<ulong> CompanionPolicyFaults = [];
+    public HashSet<ulong> CompanionPolicyPending = [];
     public string CensorSeed = Guid.NewGuid().ToString();
     public Dictionary<ulong, HashSet<string>> SelectedRetainers = [];
     public bool EnableAssigningQuickExploration = false;

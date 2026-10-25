@@ -52,3 +52,11 @@ var rollback=new PolicyControl();
 try{rollback.Acquire(12,true,false,false,()=>throw new Exception("Pause unavailable"));throw new Exception("Failure swallowed");}
 catch(Exception ex) when(ex.Message=="Pause unavailable"){Check(!rollback.Active,"Failed pause initialization rolls back untracked control");}
 Console.WriteLine($"{total} safety checks passed including acquisition rollback.");
+Check(PolicyAcknowledgement.Check(2,2,false,1000,1001)==PolicyAck.Waiting,"Closing a dialog alone does not acknowledge GC delivery");
+Check(PolicyAcknowledgement.Check(2,1,true,1000,1001)==PolicyAck.Waiting,"Inventory change with a pending dialog remains held");
+Check(PolicyAcknowledgement.Check(2,1,false,1000,1001)==PolicyAck.Completed,"Exact one-item reduction with closed dialogs acknowledges GC delivery");
+Check(PolicyAcknowledgement.Check(1,0,false,1000,1001)==PolicyAck.Completed,"Last source copy removed is valid acknowledgement");
+Check(PolicyAcknowledgement.Check(2,0,false,1000,1001)==PolicyAck.Failed,"Unexpected multiple-item removal stops GC work");
+Check(PolicyAcknowledgement.Check(2,null,false,1000,1001)==PolicyAck.Failed,"Unavailable inventory cannot acknowledge GC delivery");
+Check(PolicyAcknowledgement.Check(2,2,false,1000,11001)==PolicyAck.Failed,"Unchanged inventory cannot reopen/retry a timed-out GC transaction");
+Console.WriteLine($"{total} safety checks passed including GC acknowledgement fencing.");

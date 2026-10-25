@@ -23,14 +23,19 @@ internal static unsafe class AutoGCHandin
     private static ushort pendingRewardId;
     private static PolicyCommitGate deliveryGate=new();
     private static PolicyCommitGate hqGate=new();
+    private static long pendingQuantity;
+    private static long pendingSubmitted;
     private static void HoldPending(string reason)
     {
         Operation=false;
         CompanionPolicy.ReportFault(reason);
     }
 
-    private static string InventoryFingerprint(uint id)
+    private static string InventoryFingerprint(uint id)=>InventoryFingerprint(id,out _,out _);
+    private static string InventoryFingerprint(uint id,out long quantity)=>InventoryFingerprint(id,out quantity,out _);
+    private static string InventoryFingerprint(uint id,out long quantity,out bool loaded)
     {
+        quantity=0;loaded=false;
         var manager=InventoryManager.Instance();if(manager==null)return null;
         var copies=new List<string>();
         foreach(var type in Utils.PlayerInventoryWithArmory)
@@ -41,10 +46,13 @@ internal static unsafe class AutoGCHandin
             {
                 var item=container->GetInventorySlot(slot);
                 if(item!=null && item->ItemId%1000000==id && item->Quantity>0)
+                {
+                    quantity+=item->Quantity;
                     copies.Add($"{type}/{slot}/{item->ItemId}/{item->Quantity}/{item->Flags}");
+                }
             }
         }
-        return copies.Count==0?null:string.Join(";",copies);
+        loaded=true;return copies.Count==0?null:string.Join(";",copies);
     }
 
     private static bool PendingAllowed()
@@ -110,6 +118,19 @@ internal static unsafe class AutoGCHandin
 
     internal static void Tick()
     {
+        if(CompanionPolicy.IsManaged && deliveryGate.Submitted && pendingConfirmation!=null && pendingConfirmation.Character==Svc.ClientState.LocalContentId)
+        {
+            InventoryFingerprint(pendingConfirmation.ItemId,out var quantity,out var loaded);
+            var visible=false;
+            foreach(var name in new[]{"GrandCompanySupplyReward","SelectYesno"})
+                if(TryGetAddonByName<AtkUnitBase>(name,out var pendingAddon) && pendingAddon->IsVisible)visible=true;
+            var ack=PolicyAcknowledgement.Check(pendingQuantity,loaded?quantity:null,visible,pendingSubmitted,Environment.TickCount64);
+            if(ack==PolicyAck.Failed){HoldPending("GC inventory acknowledgement was missing or unexpected");return;}
+            if(ack==PolicyAck.Waiting){if(!Operation)HoldPending("GC stopped before inventory acknowledgement");else HandleYesno();return;}
+            try{CompanionPolicy.CompleteTransaction();}
+            catch(Exception ex){HoldPending("GC acknowledgement journal could not be cleared: "+ex.Message);return;}
+            pendingConfirmation=null;pendingDelivered=false;
+        }
         if(Svc.Condition[ConditionFlag.OccupiedInQuestEvent] && TryGetAddonByName<AtkUnitBase>("GrandCompanySupplyList", out var addon))
         {
             if(addon->X != 0 || addon->Y != 0)
@@ -155,7 +176,12 @@ internal static unsafe class AutoGCHandin
                 if(CompanionPolicy.IsManaged && !deliveryGate.Submit(true))return false;
                 pendingRewardId=addon->Id;
                 pendingDelivered=true;
-                try{new AddonMaster.GrandCompanySupplyReward(addon).Deliver();}
+                pendingSubmitted=Environment.TickCount64;
+                try
+                {
+                    if(CompanionPolicy.IsManaged)CompanionPolicy.BeginTransaction();
+                    new AddonMaster.GrandCompanySupplyReward(addon).Deliver();
+                }
                 catch(Exception ex){if(CompanionPolicy.IsManaged)HoldPending("GC delivery submission failed: "+ex.Message);throw;}
                 DebugLog($"Delivering Item");
                 return true;
@@ -373,10 +399,11 @@ internal static unsafe class AutoGCHandin
         if(CompanionPolicy.IsManaged)
         {
             if(TryGetAddonByName<AtkUnitBase>("GrandCompanySupplyReward",out _) || TryGetAddonByName<AtkUnitBase>("SelectYesno",out _))return;
-            var fingerprint=InventoryFingerprint(liveItems[which].ItemID);
+            var fingerprint=InventoryFingerprint(liveItems[which].ItemID,out var quantity);
             if(fingerprint==null)return;
             pendingConfirmation=new(Svc.ClientState.LocalContentId,liveItems[which].ItemID,fingerprint,Environment.TickCount64);
             pendingIndex=which;pendingDelivered=false;pendingRewardId=0;
+            pendingQuantity=quantity;pendingSubmitted=0;
             deliveryGate=new();hqGate=new();
         }
         if(FrameThrottler.Throttle("AutoGCHandinCallback", 10)) Callback.Fire(addon, true, 1, which, Callback.ZeroAtkValue);
