@@ -9,6 +9,7 @@ namespace AutoRetainer.PluginData;
 internal unsafe class Config
 {
     public Dictionary<ulong, string> CompanionPolicyOwners = [];
+    public HashSet<ulong> CompanionPolicyFaults = [];
     public string CensorSeed = Guid.NewGuid().ToString();
     public Dictionary<ulong, HashSet<string>> SelectedRetainers = [];
     public bool EnableAssigningQuickExploration = false;

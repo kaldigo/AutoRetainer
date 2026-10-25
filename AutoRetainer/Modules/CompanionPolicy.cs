@@ -6,13 +6,16 @@ namespace AutoRetainer.Modules;
 /// <summary>Optional, character-scoped policy. All game actions remain owned by AutoRetainer.</summary>
 internal static class CompanionPolicy
 {
-    internal const int Version = 2;
+    internal const int Version = 3;
     private static string callback;
     private static ulong character;
     private static long heartbeat;
     private static ulong handoffCharacter;
+    private static readonly PolicyControl control=new();
+    internal static bool ControlActive => control.Active;
     internal static string Status = "No companion connected";
     internal static bool IsManaged => C.CompanionPolicyOwners.ContainsKey(Svc.ClientState.LocalContentId);
+    internal static bool HasFault => IsManaged && C.CompanionPolicyFaults.Contains(Svc.ClientState.LocalContentId);
 
     internal static void Init()
     {
@@ -26,7 +29,46 @@ internal static class CompanionPolicy
         Svc.PluginInterface.GetIpcProvider<ulong, string, bool>("AutoRetainer.InventoryPolicy.Menu").RegisterFunc(Menu);
         Svc.PluginInterface.GetIpcProvider<ulong, string, bool>("AutoRetainer.InventoryPolicy.Retrieve").RegisterFunc(Retrieve);
         Svc.PluginInterface.GetIpcProvider<ulong, bool>("AutoRetainer.InventoryPolicy.OwnsHandoff").RegisterFunc(OwnsHandoff);
+        Svc.PluginInterface.GetIpcProvider<ulong, bool>("AutoRetainer.InventoryPolicy.AcquireControl").RegisterFunc(AcquireControl);
+        Svc.PluginInterface.GetIpcProvider<ulong, bool>("AutoRetainer.InventoryPolicy.ReleaseControl").RegisterFunc(control.Release);
+        Svc.PluginInterface.GetIpcProvider<ulong, bool>("AutoRetainer.InventoryPolicy.OwnsControl").RegisterFunc(OwnsControl);
+        Svc.PluginInterface.GetIpcProvider<ulong, bool>("AutoRetainer.InventoryPolicy.HasFault").RegisterFunc(cid=>C.CompanionPolicyOwners.ContainsKey(cid)&&C.CompanionPolicyFaults.Contains(cid));
+        Svc.PluginInterface.GetIpcProvider<ulong, bool>("AutoRetainer.InventoryPolicy.ClearFault").RegisterFunc(ClearFault);
+        Svc.PluginInterface.GetIpcProvider<ulong,string,object>("AutoRetainer.InventoryPolicy.Hold").RegisterAction((cid,reason)=>{if(Connected(cid))ReportFault(reason,false);});
     }
+
+    internal static void ReportFault(string reason,bool notify=true)
+    {
+        if(!IsManaged)return;
+        var cid=Svc.ClientState.LocalContentId;
+        if(C.CompanionPolicyFaults.Add(cid))
+            try{ECommons.Configuration.EzConfig.Save();}catch(Exception ex){Svc.Log.Error(ex,"Could not persist companion review hold");}
+        Status="Managed item actions held for review: "+reason;
+        MaintainPauses();
+        if(!notify)return;
+        try{Svc.PluginInterface.GetIpcSubscriber<ulong,string,object>("Steward.InventoryPolicy.Fault").InvokeAction(cid,reason);}
+        catch(Exception ex){Svc.Log.Debug(ex,Status);}
+    }
+    private static unsafe bool ClearFault(ulong cid)
+    {
+        if(!Connected(cid) || ControlActive || SchedulerMain.RetainerPostProcessLocked)return false;
+        foreach(var name in new[]{"SelectYesno","GrandCompanySupplyReward"})
+            if(TryGetAddonByName<FFXIVClientStructs.FFXIV.Component.GUI.AtkUnitBase>(name,out var addon) && addon->IsVisible)return false;
+        C.CompanionPolicyFaults.Remove(cid);ECommons.Configuration.EzConfig.Save();return true;
+    }
+
+    private static bool Connected(ulong cid) => HandoffLease.Owns(cid,character,Svc.ClientState.LocalContentId,
+        callback,heartbeat,Environment.TickCount64,true);
+    private static bool AcquireControl(ulong cid)
+    {
+        return control.Acquire(cid,Connected(cid)&&!HasFault,Utils.IsBusy,IPC.Suppressed,MaintainPauses);
+    }
+    internal static void MaintainPauses()
+    {
+        NewYesAlreadyManager.Tick();TextAdvanceManager.Tick();
+        NewYesAlreadyManager.Lock();TextAdvanceManager.LockTA();
+    }
+    private static bool OwnsControl(ulong cid) => cid!=0 && control.Owner==cid && Connected(cid);
 
     internal static void BeginHandoff(string plugin) => handoffCharacter=plugin=="Steward"?Svc.ClientState.LocalContentId:0;
     internal static void EndHandoff() => handoffCharacter=0;
@@ -34,6 +76,7 @@ internal static class CompanionPolicy
         Svc.ClientState.LocalContentId,callback,heartbeat,Environment.TickCount64,SchedulerMain.RetainerPostProcessLocked);
     private static void Tick(Dalamud.Plugin.Services.IFramework _)
     {
+        if(control.Active && !OwnsControl(control.Owner))control.Release(control.Owner);
         if(handoffCharacter!=0 && !OwnsHandoff(handoffCharacter))
         {
             handoffCharacter=0;
@@ -75,6 +118,7 @@ internal static class CompanionPolicy
     /// <summary>Checked at both candidate selection and submission. Explicit upstream protections win.</summary>
     internal static bool Allows(string action, uint itemId, uint quantity = 1, int container = -1, int slot = -1)
     {
+        if(ControlActive || HasFault)return false;
         var cid = Svc.ClientState.LocalContentId;
         if(cid == 0) return false;
         if(!C.CompanionPolicyOwners.TryGetValue(cid, out var owner)) return true;
@@ -110,7 +154,7 @@ internal static class CompanionPolicy
 
     private static bool Run(ulong cid, string operation)
     {
-        if(cid != Svc.ClientState.LocalContentId || character != cid || Environment.TickCount64-heartbeat > 5000 || Utils.IsBusy) return false;
+        if(!Connected(cid) || HasFault || Utils.IsBusy) return false;
         switch(operation)
         {
             case "Armoire": S.CabinetManager.EnqueueGoToInnAndDeliverEverything(); return true;
@@ -178,6 +222,7 @@ internal static class CompanionPolicy
 
     internal static void Shutdown()
     {
+        if(control.Active)control.Release(control.Owner);
         Svc.Framework.Update-=Tick;
         if(handoffCharacter!=0){handoffCharacter=0;SchedulerMain.RetainerPostProcessLocked=false;}
         Svc.PluginInterface.GetIpcProvider<int>("AutoRetainer.InventoryPolicy.Version").UnregisterFunc();
@@ -189,6 +234,12 @@ internal static class CompanionPolicy
         Svc.PluginInterface.GetIpcProvider<ulong, string, bool>("AutoRetainer.InventoryPolicy.Menu").UnregisterFunc();
         Svc.PluginInterface.GetIpcProvider<ulong, string, bool>("AutoRetainer.InventoryPolicy.Retrieve").UnregisterFunc();
         Svc.PluginInterface.GetIpcProvider<ulong, bool>("AutoRetainer.InventoryPolicy.OwnsHandoff").UnregisterFunc();
+        Svc.PluginInterface.GetIpcProvider<ulong, bool>("AutoRetainer.InventoryPolicy.AcquireControl").UnregisterFunc();
+        Svc.PluginInterface.GetIpcProvider<ulong, bool>("AutoRetainer.InventoryPolicy.ReleaseControl").UnregisterFunc();
+        Svc.PluginInterface.GetIpcProvider<ulong, bool>("AutoRetainer.InventoryPolicy.OwnsControl").UnregisterFunc();
+        Svc.PluginInterface.GetIpcProvider<ulong, bool>("AutoRetainer.InventoryPolicy.HasFault").UnregisterFunc();
+        Svc.PluginInterface.GetIpcProvider<ulong, bool>("AutoRetainer.InventoryPolicy.ClearFault").UnregisterFunc();
+        Svc.PluginInterface.GetIpcProvider<ulong,string,object>("AutoRetainer.InventoryPolicy.Hold").UnregisterAction();
         callback = null;
         character = 0;
     }

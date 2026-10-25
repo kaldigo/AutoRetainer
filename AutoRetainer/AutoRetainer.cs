@@ -591,6 +591,7 @@ public unsafe class AutoRetainer : IDalamudPlugin
 
     private void Tick(object _)
     {
+        if(CompanionPolicy.ControlActive || CompanionPolicy.HasFault){CompanionPolicy.MaintainPauses();return;}
         if(!IPC.Suppressed)
         {
             if(SchedulerMain.PluginEnabled && Svc.ClientState.LocalPlayer != null)
@@ -605,6 +606,7 @@ public unsafe class AutoRetainer : IDalamudPlugin
         MiniTA.Tick();
         OfflineDataManager.Tick();
         AutoGCHandin.Tick();
+        if(CompanionPolicy.HasFault)return;
         MultiMode.Tick();
         NotificationHandler.Tick();
         NewYesAlreadyManager.Tick();

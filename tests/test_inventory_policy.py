@@ -35,7 +35,7 @@ class IntegrationContract(unittest.TestCase):
   self.assertIn('private static bool ConfirmDiscard()\n    {\n        if(CompanionPolicy.IsManaged) return true;',text)
  def test_final_gc_confirmation_rechecks_live_policy(self):
   text=(ROOT/'AutoRetainer/Modules/GcHandin/AutoGCHandin.cs').read_text()
-  self.assertLess(text.index('if(!PendingAllowed() || !MatchesPendingReward'),text.index('new AddonMaster.GrandCompanySupplyReward(addon).Deliver()'))
+  self.assertLess(text.index('if(!PendingAllowed())return false;'),text.index('new AddonMaster.GrandCompanySupplyReward(addon).Deliver()'))
   self.assertIn('!pendingDelivered || !PendingAllowed()',text)
   self.assertIn('InventoryFingerprint(pendingConfirmation.ItemId)',text)
  def test_quick_sell_and_low_level_sales_are_gated(self):
@@ -56,8 +56,33 @@ class IntegrationContract(unittest.TestCase):
   self.assertIn('handoffCharacter=plugin=="Steward"?Svc.ClientState.LocalContentId:0',text)
   self.assertIn('if(handoffCharacter!=0 && !OwnsHandoff(handoffCharacter))',text)
   self.assertEqual(text.count('if(!OwnsHandoff(cid)) return false;'),2)
-  self.assertIn('internal const int Version = 2;',text)
+  self.assertIn('internal const int Version = 3;',text)
   ipc=(ROOT/'AutoRetainer/Modules/IPC.cs').read_text()
   self.assertIn('CompanionPolicy.BeginHandoff(pluginName)',ipc)
   self.assertIn('CompanionPolicy.EndHandoff()',ipc)
+ def test_standalone_control_is_owned_and_does_not_mutate_general_suppression(self):
+  text=(ROOT/'AutoRetainer/Modules/CompanionPolicy.cs').read_text()
+  self.assertIn('if(control.Active && !OwnsControl(control.Owner))control.Release(control.Owner);',text)
+  self.assertIn('if(ControlActive || HasFault)return false;',text)
+  self.assertNotIn('IPC.Suppressed=',text)
+  self.assertIn('if(CompanionPolicy.ControlActive || CompanionPolicy.HasFault){CompanionPolicy.MaintainPauses();return;}',(ROOT/'AutoRetainer/AutoRetainer.cs').read_text(encoding='utf-8-sig'))
+ def test_gc_hq_confirmation_is_owned(self):
+  text=(ROOT/'AutoRetainer/Modules/GcHandin/AutoGCHandin.cs').read_text()
+  self.assertIn('PolicyDialog.Matches(pendingRewardId,addon->ParentId,addon->HostId)',text)
+ def test_gc_submits_only_once_and_persists_uncertain_hold(self):
+  text=(ROOT/'AutoRetainer/Modules/GcHandin/AutoGCHandin.cs').read_text()
+  self.assertLess(text.index('deliveryGate.Submitted'),text.index('new AddonMaster.GrandCompanySupplyReward(addon).Deliver()'))
+  self.assertLess(text.index('hqGate.Submitted'),text.index('new AddonMaster.SelectYesno((IntPtr)addon).Yes()'))
+  self.assertIn('CompanionPolicy.ReportFault(reason)',text)
+  text=(ROOT/'AutoRetainer/Modules/CompanionPolicy.cs').read_text()
+  self.assertIn('C.CompanionPolicyFaults.Add(cid)',text)
+  self.assertIn('Steward.InventoryPolicy.Fault',text)
+  self.assertIn('addon->IsVisible)return false;',text)
+ def test_existing_dialog_automation_is_paused_before_companion_work(self):
+  source=(ROOT/'AutoRetainer/Modules/CompanionPolicy.cs').read_text()
+  self.assertIn('NewYesAlreadyManager.Lock();TextAdvanceManager.LockTA();',source)
+  self.assertIn('IPC.Suppressed,MaintainPauses)',source)
+  for name in ['NewYesAlreadyManager','TextAdvanceManager']:
+   source=(ROOT/'AutoRetainer/Modules'/f'{name}.cs').read_text()
+   self.assertIn('CompanionPolicy.ControlActive || CompanionPolicy.HasFault',source)
 if __name__=='__main__':unittest.main()

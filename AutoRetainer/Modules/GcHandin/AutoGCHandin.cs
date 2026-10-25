@@ -20,6 +20,14 @@ internal static unsafe class AutoGCHandin
     private static PolicyConfirmation pendingConfirmation;
     private static int pendingIndex;
     private static bool pendingDelivered;
+    private static ushort pendingRewardId;
+    private static PolicyCommitGate deliveryGate=new();
+    private static PolicyCommitGate hqGate=new();
+    private static void HoldPending(string reason)
+    {
+        Operation=false;
+        CompanionPolicy.ReportFault(reason);
+    }
 
     private static string InventoryFingerprint(uint id)
     {
@@ -49,8 +57,7 @@ internal static unsafe class AutoGCHandin
                 !Data.GetIMSettings().IMProtectList.Contains(pendingConfirmation.ItemId) &&
                 !S.CabinetManager.ShouldExcludeItemFromProcessing(pendingConfirmation.ItemId) &&
                 CompanionPolicy.Allows("Gc",pendingConfirmation.ItemId)))return true;
-        Operation=false;
-        pendingConfirmation=null;
+        HoldPending("GC confirmation lost its item, inventory, permission or lease");
         return false;
     }
 
@@ -142,9 +149,14 @@ internal static unsafe class AutoGCHandin
         {
             if(addon->DeliverButton->IsEnabled && FrameThrottler.Throttle(Throttler, 10))
             {
-                if(!PendingAllowed() || !MatchesPendingReward(&addon->AtkUnitBase))return false;
+                if(CompanionPolicy.IsManaged && deliveryGate.Submitted)return false;
+                if(!PendingAllowed())return false;
+                if(!MatchesPendingReward(&addon->AtkUnitBase)){HoldPending("GC reward dialog did not match the pending item");return false;}
+                if(CompanionPolicy.IsManaged && !deliveryGate.Submit(true))return false;
+                pendingRewardId=addon->Id;
                 pendingDelivered=true;
-                new AddonMaster.GrandCompanySupplyReward(addon).Deliver();
+                try{new AddonMaster.GrandCompanySupplyReward(addon).Deliver();}
+                catch(Exception ex){if(CompanionPolicy.IsManaged)HoldPending("GC delivery submission failed: "+ex.Message);throw;}
                 DebugLog($"Delivering Item");
                 return true;
             }
@@ -168,10 +180,17 @@ internal static unsafe class AutoGCHandin
                 //102434	Do you really want to trade a high-quality item?
                 if(str.Equals(GenericHelpers.GetText(Svc.Data.GetExcelSheet<Lumina.Excel.Sheets.Addon>().GetRow(102434).Text).Cleanup()))
                 {
-                    if(CompanionPolicy.IsManaged && (!pendingDelivered || !PendingAllowed()))return false;
+                    if(CompanionPolicy.IsManaged)
+                    {
+                        if(hqGate.Submitted)return false;
+                        if(!pendingDelivered || !PendingAllowed())return false;
+                        if(!PolicyDialog.Matches(pendingRewardId,addon->ParentId,addon->HostId)){HoldPending("HQ confirmation was not owned by the pending GC reward");return false;}
+                    }
                     if(FrameThrottler.Throttle(Throttler, 10))
                     {
-                        new AddonMaster.SelectYesno((IntPtr)addon).Yes();
+                        if(CompanionPolicy.IsManaged && !hqGate.Submit(true))return false;
+                        try{new AddonMaster.SelectYesno((IntPtr)addon).Yes();}
+                        catch(Exception ex){if(CompanionPolicy.IsManaged)HoldPending("GC HQ confirmation failed: "+ex.Message);throw;}
                         DebugLog($"Selecting yes");
                     }
                 }
@@ -357,7 +376,8 @@ internal static unsafe class AutoGCHandin
             var fingerprint=InventoryFingerprint(liveItems[which].ItemID);
             if(fingerprint==null)return;
             pendingConfirmation=new(Svc.ClientState.LocalContentId,liveItems[which].ItemID,fingerprint,Environment.TickCount64);
-            pendingIndex=which;pendingDelivered=false;
+            pendingIndex=which;pendingDelivered=false;pendingRewardId=0;
+            deliveryGate=new();hqGate=new();
         }
         if(FrameThrottler.Throttle("AutoGCHandinCallback", 10)) Callback.Fire(addon, true, 1, which, Callback.ZeroAtkValue);
     }

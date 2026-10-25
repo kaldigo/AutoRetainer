@@ -27,3 +27,28 @@ Check(!HandoffLease.Owns(12,12,12,"OtherPlugin",1000,1001,true),"Another endpoin
 Check(!HandoffLease.Owns(12,12,12,endpoint,1000,1001,false),"Released native lock revokes handoff");
 Check(!HandoffLease.Owns(12,12,12,endpoint,1000,999,true),"Invalid heartbeat clock revokes handoff");
 Console.WriteLine($"{total} confirmation safety checks passed.");
+var control=new PolicyControl();
+Check(!control.Acquire(0,true,false,false),"Anonymous control rejected");
+Check(!control.Acquire(12,false,false,false),"Disconnected control rejected");
+Check(!control.Acquire(12,true,true,false),"Busy AutoRetainer cannot be acquired");
+Check(!control.Acquire(12,true,false,true),"Another plugin's suppression remains respected");
+Check(control.Acquire(12,true,false,false),"Connected idle character acquires its own control");
+Check(!control.Acquire(13,true,false,false)&&control.Owner==12,"A second claimant cannot steal control");
+Check(!control.Release(13)&&control.Owner==12,"Wrong owner cannot release control");
+Check(control.Release(12)&&!control.Active,"Owner releases its control");
+Check(control.Release(12),"Release acknowledgement is idempotent after expiry/reload");
+Check(control.Acquire(13,true,false,false)&&!control.Release(12)&&control.Owner==13,"Old character cannot release a new character's control");
+Check(!PolicyDialog.Matches(0,0,0),"No owner does not match default confirmation IDs");
+Check(PolicyDialog.Matches(12,12,0)&&PolicyDialog.Matches(12,0,12),"Owned parent or host accepted");
+Check(!PolicyDialog.Matches(12,13,14),"Unrelated HQ confirmation rejected");
+Console.WriteLine($"{total} confirmation/control safety checks passed.");
+var gate=new PolicyCommitGate();
+Check(!gate.Submit(false)&&!gate.Submitted,"Revoked permission does not submit a confirmation");
+Check(gate.Submit(true)&&gate.Submitted,"Approved confirmation submits once");
+Check(!gate.Submit(true),"Unacknowledged confirmation cannot be submitted again");
+var hq=new PolicyCommitGate();Check(hq.Submit(true)&&!hq.Submit(true),"HQ confirmation is also one-shot");
+Console.WriteLine($"{total} safety checks passed including one-shot native commits.");
+var rollback=new PolicyControl();
+try{rollback.Acquire(12,true,false,false,()=>throw new Exception("Pause unavailable"));throw new Exception("Failure swallowed");}
+catch(Exception ex) when(ex.Message=="Pause unavailable"){Check(!rollback.Active,"Failed pause initialization rolls back untracked control");}
+Console.WriteLine($"{total} safety checks passed including acquisition rollback.");
