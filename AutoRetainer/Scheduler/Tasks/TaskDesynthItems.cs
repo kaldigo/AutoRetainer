@@ -74,16 +74,24 @@ public static unsafe class TaskDesynthItems
     private static void DesynthItem(InventoryItem* item)
     {
         if(!CompanionPolicy.AllowsSlot("Desynth", item->Container, item->Slot)) return;
-        var expectedId=item->ItemId;
-        var expectedQuantity=item->Quantity;
+        var expected=new PolicyItemIdentity(item->ItemId,(uint)item->Quantity,(uint)item->Container,item->Slot,(int)item->Flags);
         Svc.Log.Info($"Desynthing {ExcelItemHelper.GetName(ExcelItemHelper.Get(item->ItemId), true)} [Container={item->Container},Slot={item->Slot}]");
-        AgentSalvage.Instance()->SalvageItem(item);
+        var agent=AgentSalvage.Instance();
+        if(agent==null)return;
+        agent->SalvageItem(item);
         var retval = new AtkValue();
         Span<AtkValue> param = [
             new AtkValue { Type = ValueType.Int, Int = 0 },
             new AtkValue { Type = ValueType.Bool, Byte = 1 }
         ];
-        if(item->ItemId!=expectedId || item->Quantity!=expectedQuantity || !CompanionPolicy.AllowsSlot("Desynth", item->Container, item->Slot)) return;
-        AgentSalvage.Instance()->AgentInterface.ReceiveEvent(&retval, param.GetPointer(0), 2, 1);
+        if(!expected.Matches(new(item->ItemId,(uint)item->Quantity,(uint)item->Container,item->Slot,(int)item->Flags)) ||
+            !CompanionPolicy.AllowsSlot("Desynth", item->Container, item->Slot)) return;
+        var selected=agent->DesynthItemSlot;
+        if(CompanionPolicy.IsManaged && !expected.Matches(new(selected.ItemId,(uint)selected.Quantity,(uint)selected.Container,selected.Slot,(int)selected.Flags)))
+        {
+            CompanionPolicy.ReportFault("Desynthesis selection changed before confirmation");
+            return;
+        }
+        agent->AgentInterface.ReceiveEvent(&retval, param.GetPointer(0), 2, 1);
     }
 }

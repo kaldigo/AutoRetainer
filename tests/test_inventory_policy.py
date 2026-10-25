@@ -56,7 +56,7 @@ class IntegrationContract(unittest.TestCase):
   self.assertIn('handoffCharacter=plugin=="Steward"?Svc.ClientState.LocalContentId:0',text)
   self.assertIn('if(handoffCharacter!=0 && !OwnsHandoff(handoffCharacter))',text)
   self.assertEqual(text.count('if(!OwnsHandoff(cid)) return false;'),2)
-  self.assertIn('internal const int Version = 3;',text)
+  self.assertIn('internal const int Version = 4;',text)
   ipc=(ROOT/'AutoRetainer/Modules/IPC.cs').read_text()
   self.assertIn('CompanionPolicy.BeginHandoff(pluginName)',ipc)
   self.assertIn('CompanionPolicy.EndHandoff()',ipc)
@@ -89,4 +89,19 @@ class IntegrationContract(unittest.TestCase):
   for name in ['NewYesAlreadyManager','TextAdvanceManager']:
    source=(ROOT/'AutoRetainer/Modules'/f'{name}.cs').read_text()
    self.assertIn('CompanionPolicy.ControlActive || CompanionPolicy.HasFault',source)
+ def test_review_resets_old_gc_state_only_after_persistence(self):
+  source=(ROOT/'AutoRetainer/Modules/CompanionPolicy.cs').read_text()
+  self.assertIn('PolicyPersistence.ClearReview(',source)
+  self.assertIn('AutoGCHandin.ClearCompanionTransaction',source)
+  source=(ROOT/'AutoRetainer/Modules/GcHandin/AutoGCHandin.cs').read_text()
+  reset=source.split('internal static void ClearCompanionTransaction()')[1].split('private static void HoldPending')[0]
+  self.assertIn('pendingConfirmation=null;pendingDelivered=false;',reset)
+  self.assertIn('deliveryGate.Reset();hqGate.Reset();',reset)
+ def test_native_desynthesis_target_and_post_callback_source_are_bound(self):
+  source=(ROOT/'AutoRetainer/Scheduler/Tasks/TaskDesynthItems.cs').read_text()
+  self.assertIn('var selected=agent->DesynthItemSlot;',source)
+  self.assertLess(source.index('expected.Matches(new(selected.ItemId'),source.index('agent->AgentInterface.ReceiveEvent'))
+  source=(ROOT/'AutoRetainer/Modules/CompanionPolicy.cs').read_text()
+  self.assertIn('expected.Matches(new(item->ItemId',source)
+  self.assertIn('!Data.GetIMSettings().IMProtectList.Contains(expected.ItemId)',source)
 if __name__=='__main__':unittest.main()

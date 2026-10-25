@@ -60,3 +60,25 @@ Check(PolicyAcknowledgement.Check(2,0,false,1000,1001)==PolicyAck.Failed,"Unexpe
 Check(PolicyAcknowledgement.Check(2,null,false,1000,1001)==PolicyAck.Failed,"Unavailable inventory cannot acknowledge GC delivery");
 Check(PolicyAcknowledgement.Check(2,2,false,1000,11001)==PolicyAck.Failed,"Unchanged inventory cannot reopen/retry a timed-out GC transaction");
 Console.WriteLine($"{total} safety checks passed including GC acknowledgement fencing.");
+var faults=new HashSet<ulong>{12};var journal=new HashSet<ulong>{12};var resets=0;
+var reviewedGate=new PolicyCommitGate();reviewedGate.Submit(true);
+try{PolicyPersistence.ClearReview(faults,journal,12,()=>throw new System.IO.IOException("disk"),()=>resets++);throw new Exception("Save failure swallowed");}
+catch(System.IO.IOException){Check(faults.Contains(12)&&journal.Contains(12)&&resets==0,"Failed review save restores both guards and does not reset a live transaction");}
+PolicyPersistence.ClearReview(faults,journal,12,()=>{},()=>{resets++;reviewedGate.Reset();});
+Check(!faults.Contains(12)&&!journal.Contains(12)&&resets==1,"Successful explicit review clears both markers and resets transaction state exactly once");
+Check(reviewedGate.Submit(true),"A successfully reviewed transaction can submit afresh without re-latching its old commit state");
+var owners=new Dictionary<ulong,string>{{12,"Steward"}};
+try{PolicyPersistence.Relax(()=>owners.Remove(12),()=>throw new System.IO.IOException("disk"),()=>owners[12]="Steward");throw new Exception("Detach save failure swallowed");}
+catch(System.IO.IOException){Check(owners.ContainsKey(12),"Failed detach cannot restore unmanaged disposal in memory");}
+journal.Add(12);
+try{PolicyPersistence.Relax(()=>journal.Remove(12),()=>throw new System.IO.IOException("disk"),()=>journal.Add(12));throw new Exception("Ack save failure swallowed");}
+catch(System.IO.IOException){Check(journal.Contains(12),"Failed acknowledgement save retains the pending transaction marker");}
+var identity=new PolicyItemIdentity(42,1,0,3,0);
+Check(identity.Matches(new(42,1,0,3,0)),"Selected desynthesis identity matches its authorization");
+Check(!identity.Matches(new(43,1,0,3,0)),"Changed selected item is blocked");
+Check(!identity.Matches(new(42,2,0,3,0)),"Changed selected quantity is blocked");
+Check(!identity.Matches(new(42,1,1,3,0)),"Changed selected container is blocked");
+Check(!identity.Matches(new(42,1,0,4,0)),"Changed selected slot is blocked");
+Check(!identity.Matches(new(42,1,0,3,1)),"Changed selected quality/flags are blocked");
+Check(!new PolicyItemIdentity(0,1,0,3,0).Matches(new(0,1,0,3,0)),"Empty selected identity never authorizes destruction");
+Console.WriteLine($"{total} safety checks passed including recovery persistence and desynthesis target binding.");

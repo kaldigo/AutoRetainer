@@ -25,6 +25,13 @@ internal static unsafe class AutoGCHandin
     private static PolicyCommitGate hqGate=new();
     private static long pendingQuantity;
     private static long pendingSubmitted;
+    internal static void ClearCompanionTransaction()
+    {
+        Operation=false;
+        pendingConfirmation=null;pendingDelivered=false;pendingIndex=0;pendingRewardId=0;
+        pendingQuantity=pendingSubmitted=0;
+        deliveryGate.Reset();hqGate.Reset();
+    }
     private static void HoldPending(string reason)
     {
         Operation=false;

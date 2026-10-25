@@ -6,7 +6,7 @@ namespace AutoRetainer.Modules;
 /// <summary>Optional, character-scoped policy. All game actions remain owned by AutoRetainer.</summary>
 internal static class CompanionPolicy
 {
-    internal const int Version = 3;
+    internal const int Version = 4;
     private static string callback;
     private static ulong character;
     private static long heartbeat;
@@ -45,7 +45,7 @@ internal static class CompanionPolicy
         if(C.CompanionPolicyFaults.Add(cid))
             try{ECommons.Configuration.EzConfig.Save();}catch(Exception ex){Svc.Log.Error(ex,"Could not persist companion review hold");}
         Status="Managed item actions held for review: "+reason;
-        MaintainPauses();
+        try{MaintainPauses();}catch(Exception ex){Svc.Log.Error(ex,"Could not maintain dialog pauses; item actions remain held");}
         if(!notify)return;
         try{Svc.PluginInterface.GetIpcSubscriber<ulong,string,object>("Steward.InventoryPolicy.Fault").InvokeAction(cid,reason);}
         catch(Exception ex){Svc.Log.Debug(ex,Status);}
@@ -57,15 +57,20 @@ internal static class CompanionPolicy
     }
     internal static void CompleteTransaction()
     {
-        C.CompanionPolicyPending.Remove(Svc.ClientState.LocalContentId);
-        ECommons.Configuration.EzConfig.Save();
+        var cid=Svc.ClientState.LocalContentId;
+        var pending=C.CompanionPolicyPending.Contains(cid);
+        PolicyPersistence.Relax(()=>C.CompanionPolicyPending.Remove(cid),()=>ECommons.Configuration.EzConfig.Save(),
+            ()=>{if(pending)C.CompanionPolicyPending.Add(cid);});
     }
     private static unsafe bool ClearFault(ulong cid)
     {
         if(!Connected(cid) || ControlActive || SchedulerMain.RetainerPostProcessLocked)return false;
+        if(C.CompanionPolicyPending.Contains(cid) && !C.CompanionPolicyFaults.Contains(cid))return false;
         foreach(var name in new[]{"SelectYesno","GrandCompanySupplyReward"})
             if(TryGetAddonByName<FFXIVClientStructs.FFXIV.Component.GUI.AtkUnitBase>(name,out var addon) && addon->IsVisible)return false;
-        C.CompanionPolicyFaults.Remove(cid);C.CompanionPolicyPending.Remove(cid);ECommons.Configuration.EzConfig.Save();return true;
+        PolicyPersistence.ClearReview(C.CompanionPolicyFaults,C.CompanionPolicyPending,cid,
+            ()=>ECommons.Configuration.EzConfig.Save(),AutoGCHandin.ClearCompanionTransaction);
+        return true;
     }
 
     private static bool Connected(ulong cid) => HandoffLease.Owns(cid,character,Svc.ClientState.LocalContentId,
@@ -120,8 +125,8 @@ internal static class CompanionPolicy
     private static bool Detach(ulong cid, string endpoint)
     {
         if(cid != Svc.ClientState.LocalContentId || !C.CompanionPolicyOwners.TryGetValue(cid, out var owner) || owner != endpoint) return false;
-        C.CompanionPolicyOwners.Remove(cid);
-        ECommons.Configuration.EzConfig.Save();
+        PolicyPersistence.Relax(()=>C.CompanionPolicyOwners.Remove(cid),()=>ECommons.Configuration.EzConfig.Save(),
+            ()=>C.CompanionPolicyOwners[cid]=owner);
         character = 0;
         callback = null;
         Status = "Companion detached; original AutoRetainer rules apply";
@@ -163,7 +168,15 @@ internal static class CompanionPolicy
         var inv = manager->GetInventoryContainer(container);
         if(inv == null || !inv->IsLoaded || slot < 0 || slot >= inv->Size) return false;
         var item = inv->GetInventorySlot(slot);
-        return item != null && item->ItemId != 0 && item->Quantity > 0 && Allows(action, item->ItemId, (uint)item->Quantity, (int)container, slot);
+        if(item==null || item->ItemId==0 || item->Quantity<=0)return false;
+        var expected=new PolicyItemIdentity(item->ItemId,(uint)item->Quantity,(uint)container,slot,(int)item->Flags);
+        if(Data.GetIMSettings().IMProtectList.Contains(expected.ItemId))return false;
+        if(!Allows(action,expected.ItemId,expected.Quantity,(int)container,slot))return false;
+        inv=manager->GetInventoryContainer(container);
+        if(inv==null || !inv->IsLoaded || slot>=inv->Size)return false;
+        item=inv->GetInventorySlot(slot);
+        return item!=null && !Data.GetIMSettings().IMProtectList.Contains(expected.ItemId) &&
+            expected.Matches(new(item->ItemId,(uint)item->Quantity,(uint)container,slot,(int)item->Flags));
     }
 
     private static bool Run(ulong cid, string operation)

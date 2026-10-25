@@ -22,6 +22,7 @@ internal static class PolicyDialog
 internal sealed class PolicyCommitGate
 {
     internal bool Submitted { get; private set; }
+    internal void Reset()=>Submitted=false;
     internal bool Submit(bool permitted)
     {
         if(Submitted || !permitted)return false;
