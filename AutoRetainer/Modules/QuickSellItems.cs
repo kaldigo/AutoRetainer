@@ -128,6 +128,8 @@ public unsafe class QuickSellItems : IDisposable
                     {
                         if(x.Enabled && x.Text.EqualsAny(text))
                         {
+                            if(x.Text==retainerSellText && !CompanionPolicy.AllowsSlot("Vendor",inventoryType,slot)) continue;
+                            if(x.Text==putUpForSaleText && !CompanionPolicy.AllowsSlot("Market",inventoryType,slot)) continue;
                             x.Select();
                             break;
                         }

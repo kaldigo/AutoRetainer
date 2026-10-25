@@ -74,6 +74,8 @@ public static unsafe class TaskDesynthItems
     private static void DesynthItem(InventoryItem* item)
     {
         if(!CompanionPolicy.AllowsSlot("Desynth", item->Container, item->Slot)) return;
+        var expectedId=item->ItemId;
+        var expectedQuantity=item->Quantity;
         Svc.Log.Info($"Desynthing {ExcelItemHelper.GetName(ExcelItemHelper.Get(item->ItemId), true)} [Container={item->Container},Slot={item->Slot}]");
         AgentSalvage.Instance()->SalvageItem(item);
         var retval = new AtkValue();
@@ -81,6 +83,7 @@ public static unsafe class TaskDesynthItems
             new AtkValue { Type = ValueType.Int, Int = 0 },
             new AtkValue { Type = ValueType.Bool, Byte = 1 }
         ];
+        if(item->ItemId!=expectedId || item->Quantity!=expectedQuantity || !CompanionPolicy.AllowsSlot("Desynth", item->Container, item->Slot)) return;
         AgentSalvage.Instance()->AgentInterface.ReceiveEvent(&retval, param.GetPointer(0), 2, 1);
     }
 }

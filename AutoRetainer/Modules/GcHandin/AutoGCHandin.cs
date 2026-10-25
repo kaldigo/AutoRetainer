@@ -17,6 +17,56 @@ internal static unsafe class AutoGCHandin
 {
     internal static AutoGCHandinOverlay Overlay;
     internal static bool Operation = false;
+    private static PolicyConfirmation pendingConfirmation;
+    private static int pendingIndex;
+    private static bool pendingDelivered;
+
+    private static string InventoryFingerprint(uint id)
+    {
+        var manager=InventoryManager.Instance();if(manager==null)return null;
+        var copies=new List<string>();
+        foreach(var type in Utils.PlayerInventoryWithArmory)
+        {
+            var container=manager->GetInventoryContainer(type);
+            if(container==null || !container->IsLoaded)return null;
+            for(var slot=0;slot<container->Size;slot++)
+            {
+                var item=container->GetInventorySlot(slot);
+                if(item!=null && item->ItemId%1000000==id && item->Quantity>0)
+                    copies.Add($"{type}/{slot}/{item->ItemId}/{item->Quantity}/{item->Flags}");
+            }
+        }
+        return copies.Count==0?null:string.Join(";",copies);
+    }
+
+    private static bool PendingAllowed()
+    {
+        if(!CompanionPolicy.IsManaged)return true;
+        var items=GetHandinItems();
+        if(pendingConfirmation!=null && pendingIndex>=0 && pendingIndex<items.Count &&
+            pendingConfirmation.StillValid(Svc.ClientState.LocalContentId,items[pendingIndex].ItemID,
+                InventoryFingerprint(pendingConfirmation.ItemId),Environment.TickCount64,
+                !Data.GetIMSettings().IMProtectList.Contains(pendingConfirmation.ItemId) &&
+                !S.CabinetManager.ShouldExcludeItemFromProcessing(pendingConfirmation.ItemId) &&
+                CompanionPolicy.Allows("Gc",pendingConfirmation.ItemId)))return true;
+        Operation=false;
+        pendingConfirmation=null;
+        return false;
+    }
+
+    private static bool MatchesPendingReward(AtkUnitBase* addon)
+    {
+        if(!CompanionPolicy.IsManaged)return true;
+        if(pendingConfirmation==null)return false;
+        var expected=ExcelItemHelper.GetName(pendingConfirmation.ItemId);
+        for(var index=0;index<addon->UldManager.NodeListCount;index++)
+        {
+            var node=addon->UldManager.NodeList[index];
+            if(node!=null && node->Type==NodeType.Text &&
+                ((AtkTextNode*)node)->NodeText.GetText().Cleanup().Trim()==expected)return true;
+        }
+        return false; // An unknown or mismatched reward dialog must not be acknowledged.
+    }
 
     internal static bool IsEnabled()
     {
@@ -92,6 +142,8 @@ internal static unsafe class AutoGCHandin
         {
             if(addon->DeliverButton->IsEnabled && FrameThrottler.Throttle(Throttler, 10))
             {
+                if(!PendingAllowed() || !MatchesPendingReward(&addon->AtkUnitBase))return false;
+                pendingDelivered=true;
                 new AddonMaster.GrandCompanySupplyReward(addon).Deliver();
                 DebugLog($"Delivering Item");
                 return true;
@@ -116,6 +168,7 @@ internal static unsafe class AutoGCHandin
                 //102434	Do you really want to trade a high-quality item?
                 if(str.Equals(GenericHelpers.GetText(Svc.Data.GetExcelSheet<Lumina.Excel.Sheets.Addon>().GetRow(102434).Text).Cleanup()))
                 {
+                    if(CompanionPolicy.IsManaged && (!pendingDelivered || !PendingAllowed()))return false;
                     if(FrameThrottler.Throttle(Throttler, 10))
                     {
                         new AddonMaster.SelectYesno((IntPtr)addon).Yes();
@@ -298,6 +351,14 @@ internal static unsafe class AutoGCHandin
     {
         var liveItems = GetHandinItems();
         if(which < 0 || which >= liveItems.Count || !CompanionPolicy.Allows("Gc", liveItems[which].ItemID)) return;
+        if(CompanionPolicy.IsManaged)
+        {
+            if(TryGetAddonByName<AtkUnitBase>("GrandCompanySupplyReward",out _) || TryGetAddonByName<AtkUnitBase>("SelectYesno",out _))return;
+            var fingerprint=InventoryFingerprint(liveItems[which].ItemID);
+            if(fingerprint==null)return;
+            pendingConfirmation=new(Svc.ClientState.LocalContentId,liveItems[which].ItemID,fingerprint,Environment.TickCount64);
+            pendingIndex=which;pendingDelivered=false;
+        }
         if(FrameThrottler.Throttle("AutoGCHandinCallback", 10)) Callback.Fire(addon, true, 1, which, Callback.ZeroAtkValue);
     }
 

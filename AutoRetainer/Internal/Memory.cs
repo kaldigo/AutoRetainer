@@ -52,6 +52,7 @@ internal unsafe class Memory : IDisposable
 
     internal void RetainerItemCommandDetour(nint AgentRetainerItemCommandModule, uint slot, InventoryType inventoryType, uint a4, RetainerItemCommand command)
     {
+        if(command == RetainerItemCommand.HaveRetainerSellItem && !CompanionPolicy.AllowsSlot("Vendor", inventoryType, (int)slot)) return;
         try
         {
             DebugLog($"RetainerItemCommandDetour: {AgentRetainerItemCommandModule:X16}, slot={slot}, type={inventoryType}, a4={a4}, command={command}");
@@ -123,6 +124,7 @@ internal unsafe class Memory : IDisposable
 
     public void SellItemToShop(InventoryType type, int slot)
     {
+        if(!CompanionPolicy.AllowsSlot("Vendor", type, slot)) return;
         if(TryGetAddonByName<AtkUnitBase>("Shop", out var addon) && IsAddonReady(addon))
         {
             var slotPtr = InventoryManager.Instance()->GetInventoryContainer(type)->GetInventorySlot(slot);

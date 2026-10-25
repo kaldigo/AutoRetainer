@@ -65,6 +65,7 @@ internal static class IPC
 
     private static void FinishRetainerPostprocessRequest()
     {
+        CompanionPolicy.EndHandoff();
         Log("Received retainer postprocess request finish");
         SchedulerMain.RetainerPostProcessLocked = false;
     }
@@ -186,6 +187,7 @@ internal static class IPC
 
     internal static void FireRetainerPostprocessEvent(string pluginName, string retainer)
     {
+        CompanionPolicy.BeginHandoff(pluginName);
         Log($"Firing FireRetainerPostprocessEvent for {retainer} for plugin {pluginName}");
         Svc.PluginInterface.GetIpcProvider<string, string, object>(ApiConsts.OnRetainerReadyForPostprocess).SendMessage(pluginName, retainer);
     }

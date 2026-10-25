@@ -29,4 +29,35 @@ class IntegrationContract(unittest.TestCase):
   self.assertIn('origin/master',release)
  def test_pinned_dependencies_are_not_updated_by_build(self):
   self.assertNotIn('submodule update --remote',(ROOT/'tools/build.ps1').read_text())
+ def test_managed_discard_never_enters_confirmation(self):
+  text=(ROOT/'AutoRetainer/Scheduler/Tasks/TaskRecursiveItemDiscard.cs').read_text()
+  self.assertIn('if(CompanionPolicy.IsManaged) return;',text)
+  self.assertIn('private static bool ConfirmDiscard()\n    {\n        if(CompanionPolicy.IsManaged) return true;',text)
+ def test_final_gc_confirmation_rechecks_live_policy(self):
+  text=(ROOT/'AutoRetainer/Modules/GcHandin/AutoGCHandin.cs').read_text()
+  self.assertLess(text.index('if(!PendingAllowed() || !MatchesPendingReward'),text.index('new AddonMaster.GrandCompanySupplyReward(addon).Deliver()'))
+  self.assertIn('!pendingDelivered || !PendingAllowed()',text)
+  self.assertIn('InventoryFingerprint(pendingConfirmation.ItemId)',text)
+ def test_quick_sell_and_low_level_sales_are_gated(self):
+  text=(ROOT/'AutoRetainer/Modules/QuickSellItems.cs').read_text()
+  self.assertIn('!CompanionPolicy.AllowsSlot("Vendor"',text)
+  self.assertIn('!CompanionPolicy.AllowsSlot("Market"',text)
+  text=(ROOT/'AutoRetainer/Internal/Memory.cs').read_text()
+  self.assertIn('command == RetainerItemCommand.HaveRetainerSellItem && !CompanionPolicy.AllowsSlot',text)
+  self.assertIn('public void SellItemToShop(InventoryType type, int slot)\n    {\n        if(!CompanionPolicy.AllowsSlot',text)
+ def test_managed_bulk_cannot_outlive_per_item_policy(self):
+  text=(ROOT/'AutoRetainer/Modules/CompanionPolicy.cs').read_text()
+  body=text.split('internal static unsafe bool AllowsDresserBatch()')[1].split('internal static void Shutdown()')[0]
+  self.assertIn('if(!C.CompanionPolicyOwners.ContainsKey(Svc.ClientState.LocalContentId)) return true;',body)
+  self.assertIn('return false;',body)
+  self.assertNotIn('AllowsSlot("Dresser"',body)
+ def test_lease_watchdog_only_releases_its_recorded_handoff(self):
+  text=(ROOT/'AutoRetainer/Modules/CompanionPolicy.cs').read_text()
+  self.assertIn('handoffCharacter=plugin=="Steward"?Svc.ClientState.LocalContentId:0',text)
+  self.assertIn('if(handoffCharacter!=0 && !OwnsHandoff(handoffCharacter))',text)
+  self.assertEqual(text.count('if(!OwnsHandoff(cid)) return false;'),2)
+  self.assertIn('internal const int Version = 2;',text)
+  ipc=(ROOT/'AutoRetainer/Modules/IPC.cs').read_text()
+  self.assertIn('CompanionPolicy.BeginHandoff(pluginName)',ipc)
+  self.assertIn('CompanionPolicy.EndHandoff()',ipc)
 if __name__=='__main__':unittest.main()

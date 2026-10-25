@@ -15,6 +15,7 @@ public unsafe static class TaskRecursiveItemDiscard
     private static List<InventoryDescriptor> ProcessedSlots = [];
     public static void EnqueueIfNeeded()
     {
+        if(CompanionPolicy.IsManaged) return; // Steward never authorizes discard, including its confirmations.
         if(Data.GetIMSettings().IMDiscardList.Count == 0) return;
         P.TaskManager.Enqueue(() =>
         {
@@ -30,6 +31,7 @@ public unsafe static class TaskRecursiveItemDiscard
 
     private static bool RecursivelyDiscardItems()
     {
+        if(CompanionPolicy.IsManaged) return true;
         var im = InventoryManager.Instance();
         foreach(var invType in Data.GetDiscardableInventories())
         {
@@ -78,6 +80,7 @@ public unsafe static class TaskRecursiveItemDiscard
 
     private static bool ConfirmDiscard()
     {
+        if(CompanionPolicy.IsManaged) return true;
         if(Data.GetIMSettings().IMDry)
         {
             return true;

@@ -6,14 +6,17 @@ namespace AutoRetainer.Modules;
 /// <summary>Optional, character-scoped policy. All game actions remain owned by AutoRetainer.</summary>
 internal static class CompanionPolicy
 {
-    internal const int Version = 1;
+    internal const int Version = 2;
     private static string callback;
     private static ulong character;
     private static long heartbeat;
+    private static ulong handoffCharacter;
     internal static string Status = "No companion connected";
+    internal static bool IsManaged => C.CompanionPolicyOwners.ContainsKey(Svc.ClientState.LocalContentId);
 
     internal static void Init()
     {
+        Svc.Framework.Update+=Tick;
         Svc.PluginInterface.GetIpcProvider<int>("AutoRetainer.InventoryPolicy.Version").RegisterFunc(() => Version);
         Svc.PluginInterface.GetIpcProvider<ulong, string, bool>("AutoRetainer.InventoryPolicy.Connect").RegisterFunc(Connect);
         Svc.PluginInterface.GetIpcProvider<ulong, string, bool>("AutoRetainer.InventoryPolicy.Heartbeat").RegisterFunc(Pulse);
@@ -22,6 +25,21 @@ internal static class CompanionPolicy
         Svc.PluginInterface.GetIpcProvider<ulong, string, bool>("AutoRetainer.InventoryPolicy.Run").RegisterFunc(Run);
         Svc.PluginInterface.GetIpcProvider<ulong, string, bool>("AutoRetainer.InventoryPolicy.Menu").RegisterFunc(Menu);
         Svc.PluginInterface.GetIpcProvider<ulong, string, bool>("AutoRetainer.InventoryPolicy.Retrieve").RegisterFunc(Retrieve);
+        Svc.PluginInterface.GetIpcProvider<ulong, bool>("AutoRetainer.InventoryPolicy.OwnsHandoff").RegisterFunc(OwnsHandoff);
+    }
+
+    internal static void BeginHandoff(string plugin) => handoffCharacter=plugin=="Steward"?Svc.ClientState.LocalContentId:0;
+    internal static void EndHandoff() => handoffCharacter=0;
+    private static bool OwnsHandoff(ulong cid) => cid==handoffCharacter && HandoffLease.Owns(handoffCharacter,character,
+        Svc.ClientState.LocalContentId,callback,heartbeat,Environment.TickCount64,SchedulerMain.RetainerPostProcessLocked);
+    private static void Tick(Dalamud.Plugin.Services.IFramework _)
+    {
+        if(handoffCharacter!=0 && !OwnsHandoff(handoffCharacter))
+        {
+            handoffCharacter=0;
+            SchedulerMain.RetainerPostProcessLocked=false;
+            Status="Steward handoff released: its lease or character became unavailable";
+        }
     }
 
     private static bool Connect(ulong cid, string endpoint)
@@ -82,7 +100,9 @@ internal static class CompanionPolicy
 
     internal static unsafe bool AllowsSlot(string action, InventoryType container, int slot)
     {
-        var inv = InventoryManager.Instance()->GetInventoryContainer(container);
+        var manager = InventoryManager.Instance();
+        if(manager == null) return false;
+        var inv = manager->GetInventoryContainer(container);
         if(inv == null || !inv->IsLoaded || slot < 0 || slot >= inv->Size) return false;
         var item = inv->GetInventorySlot(slot);
         return item != null && item->ItemId != 0 && item->Quantity > 0 && Allows(action, item->ItemId, (uint)item->Quantity, (int)container, slot);
@@ -104,7 +124,7 @@ internal static class CompanionPolicy
 
     private static unsafe bool Menu(ulong cid, string menu)
     {
-        if(cid!=Svc.ClientState.LocalContentId || character!=cid || Environment.TickCount64-heartbeat>5000 || !SchedulerMain.RetainerPostProcessLocked) return false;
+        if(!OwnsHandoff(cid)) return false;
         if(menu=="Inventory")
         {
             if(Internal.InventoryManagement.InventorySpaceManager.IsRetainerInventoryLoaded()) return true;
@@ -127,7 +147,7 @@ internal static class CompanionPolicy
 
     private static unsafe bool Retrieve(ulong cid,string request)
     {
-        if(cid!=Svc.ClientState.LocalContentId || character!=cid || Environment.TickCount64-heartbeat>5000 || !SchedulerMain.RetainerPostProcessLocked) return false;
+        if(!OwnsHandoff(cid)) return false;
         var expected=JsonConvert.DeserializeObject<Retrieval>(request);
         if(expected==null || !Enum.IsDefined((InventoryType)expected.Container) || !Utils.RetainerInventories.Contains((InventoryType)expected.Container))return false;
         var type=(InventoryType)expected.Container;
@@ -151,22 +171,15 @@ internal static class CompanionPolicy
     internal static unsafe bool AllowsDresserBatch()
     {
         if(!C.CompanionPolicyOwners.ContainsKey(Svc.ClientState.LocalContentId)) return true;
-        foreach(var type in Utils.PlayerInventoryWithArmory)
-        {
-            var inv=InventoryManager.Instance()->GetInventoryContainer(type);
-            if(inv == null || !inv->IsLoaded) return false;
-            for(var slot=0; slot<inv->Size; slot++)
-            {
-                var item=inv->GetInventorySlot(slot);
-                if(item->ItemId != 0 && Utils.CanItemBePartOfMirageSet(item->ItemId) && !Utils.IsItemAlreadyMiraged(item->ItemId)
-                    && !AllowsSlot("Dresser", type, slot)) return false;
-            }
-        }
-        return true;
+        // The bulk IPC has no final per-item policy callback, and can outlive the companion lease.
+        Status = "Managed bulk dresser storage held: use individually validated transfers";
+        return false;
     }
 
     internal static void Shutdown()
     {
+        Svc.Framework.Update-=Tick;
+        if(handoffCharacter!=0){handoffCharacter=0;SchedulerMain.RetainerPostProcessLocked=false;}
         Svc.PluginInterface.GetIpcProvider<int>("AutoRetainer.InventoryPolicy.Version").UnregisterFunc();
         Svc.PluginInterface.GetIpcProvider<ulong, string, bool>("AutoRetainer.InventoryPolicy.Connect").UnregisterFunc();
         Svc.PluginInterface.GetIpcProvider<ulong, string, bool>("AutoRetainer.InventoryPolicy.Heartbeat").UnregisterFunc();
@@ -175,6 +188,7 @@ internal static class CompanionPolicy
         Svc.PluginInterface.GetIpcProvider<ulong, string, bool>("AutoRetainer.InventoryPolicy.Run").UnregisterFunc();
         Svc.PluginInterface.GetIpcProvider<ulong, string, bool>("AutoRetainer.InventoryPolicy.Menu").UnregisterFunc();
         Svc.PluginInterface.GetIpcProvider<ulong, string, bool>("AutoRetainer.InventoryPolicy.Retrieve").UnregisterFunc();
+        Svc.PluginInterface.GetIpcProvider<ulong, bool>("AutoRetainer.InventoryPolicy.OwnsHandoff").UnregisterFunc();
         callback = null;
         character = 0;
     }

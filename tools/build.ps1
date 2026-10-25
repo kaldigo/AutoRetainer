@@ -13,6 +13,8 @@ try {
         $binary=Join-Path $root "$($cfg.build)/$($cfg.internal_name).dll"
         if ([Reflection.AssemblyName]::GetAssemblyName($binary).Version -ne [version]$Version) { throw 'Actual DLL version differs from planned release' }
     }
+    dotnet run --project tests/PolicySafety/PolicySafety.csproj -c Release
+    if ($LASTEXITCODE) { throw 'Confirmation safety tests failed' }
     python -m unittest discover -s tests -p 'test_*.py' -v
     if ($LASTEXITCODE) { throw 'Integration regression checks failed' }
 } finally { Pop-Location }
