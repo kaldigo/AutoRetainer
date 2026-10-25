@@ -1,0 +1,6 @@
+<Project>
+  <!-- API 15 now exposes another ExcelPage; preserve the pinned ECommons source. -->
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'ECommons'">
+    <Compile Include="$(MSBuildThisFileDirectory)compat/ExcelPageAlias.cs" />
+  </ItemGroup>
+</Project>

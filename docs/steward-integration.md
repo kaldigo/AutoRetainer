@@ -1,0 +1,15 @@
+# Steward inventory integration
+
+This fork preserves AutoRetainer's assembly, InternalName, display name, commands, configuration and existing IPC. The icon is a recolouring of the original emblem in the maintained forks' green-to-magenta palette. Existing functionality remains enabled and configured in AutoRetainer.
+
+The new `AutoRetainer.InventoryPolicy.*` protocol is version 1. `Connect(contentId, callback)` claims a current character and persists only that ownership marker in AutoRetainer's own configuration. The sole supported callback is `Steward.InventoryPolicy.Evaluate`. `Heartbeat` renews a five-second lease. `Detach` explicitly restores the original rules. Missing callbacks, invalid responses, stale leases and policy exceptions hold managed item actions. Characters never connected behave as upstream.
+
+Before candidate processing and submission, AutoRetainer asks Steward with JSON containing Version, Character, Action, ItemId, Quantity, Container and Slot. Only the literal response `Allow` authorizes handling. Existing explicit AutoRetainer protection lists and enabled features still apply. Vendor, desynthesis, GC delivery, discard and armoire paths have policy gates; managed discard is denied by Steward. `Run` delegates to existing AutoRetainer work. `Menu` and `Retrieve` are restricted to an owned retainer postprocess handoff; retrieval uses AutoRetainer's existing native action and validates the source slot and free space.
+
+Glamour Log currently exposes bulk dresser storage rather than a selected-item request. The bridge checks every eligible outfit candidate and holds the entire bulk operation if any candidate is excluded by Steward. It does not silently store excluded items. Glamour Log’s outfit workflow remains in place. The existing dresser-opening workflow has an additive leave-open overload for the companion; the original zero-argument method remains available and keeps its original closing behaviour. Steward handles the missing loose-item action through the native UI, with source and confirmation checks, after AutoRetainer becomes idle.
+
+Upstream vendor/desynthesis lists remain selectors. Steward filters their candidates; it does not overwrite those lists or force every unwanted item into unconditional vendor sale. GC delivery already enumerates native delivery candidates. In particular, a skipped GC action or capped seals must not be interpreted as ineligibility.
+
+Upstream reference: cc020df0efee3ea65a45117e2b89999108c702e8. Its pinned ECommons source requires a narrow ExcelPage alias with current API 15 references. The alias is injected by Directory.Build.targets, leaving the submodule pin untouched. Upstream CONTRIBUTING.md prohibits AI-generated contributions; no upstream contribution is proposed.
+
+Native validation remains pending: all automation should first be checked with disposable test items and the companion's default dry run. Build and contract checks cannot validate game-memory readiness, UI event delivery or server acknowledgements.

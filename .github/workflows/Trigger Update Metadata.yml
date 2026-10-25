@@ -7,6 +7,7 @@ on:
 
 jobs:
   TriggerUpdateMetadata:
+    if: github.repository == 'PunishXIV/AutoRetainer'
     uses:
       NightmareXIV/MyDalamudPlugins/.github/workflows/Update_Metadata.yml@main
     secrets: inherit

@@ -1,4 +1,4 @@
-﻿using AutoRetainer.UI.Overlays;
+using AutoRetainer.UI.Overlays;
 using AutoRetainerAPI.Configuration;
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Utility;
@@ -296,6 +296,8 @@ internal static unsafe class AutoGCHandin
 
     internal static void InvokeHandin(AtkUnitBase* addon, int which)
     {
+        var liveItems = GetHandinItems();
+        if(which < 0 || which >= liveItems.Count || !CompanionPolicy.Allows("Gc", liveItems[which].ItemID)) return;
         if(FrameThrottler.Throttle("AutoGCHandinCallback", 10)) Callback.Fire(addon, true, 1, which, Callback.ZeroAtkValue);
     }
 
@@ -323,6 +325,7 @@ internal static unsafe class AutoGCHandin
         {
             var item = items[i];
             if(Data.GetIMSettings().IMProtectList.Contains(item.ItemID)) continue;
+            if(!CompanionPolicy.Allows("Gc", item.ItemID)) continue;
             if(S.CabinetManager.ShouldExcludeItemFromProcessing(item.ItemID)) continue;
             var seals = (uint)(item.Seals * Utils.GetGCSealMultiplier());
             if(!checkSealCap || sealsRemaining > seals) candidates.Add((item.ItemID, seals, i));

@@ -1,4 +1,4 @@
-﻿using AutoRetainerAPI.Configuration;
+using AutoRetainerAPI.Configuration;
 using ECommons.Configuration;
 using ECommons.ExcelServices;
 using ECommons.Interop;
@@ -8,6 +8,7 @@ namespace AutoRetainer.PluginData;
 [Serializable]
 internal unsafe class Config
 {
+    public Dictionary<ulong, string> CompanionPolicyOwners = [];
     public string CensorSeed = Guid.NewGuid().ToString();
     public Dictionary<ulong, HashSet<string>> SelectedRetainers = [];
     public bool EnableAssigningQuickExploration = false;

@@ -1,4 +1,4 @@
-﻿using Dalamud.Game.ClientState.Conditions;
+using Dalamud.Game.ClientState.Conditions;
 using ECommons.ExcelServices;
 using ECommons.Throttlers;
 using FFXIVClientStructs.FFXIV.Client.Game;
@@ -68,11 +68,12 @@ public static unsafe class TaskDesynthItems
 
     private static bool IsOnIMList(uint itemID)
     {
-        return !Data.GetIMSettings().IMProtectList.Contains(itemID) && Data.GetIMSettings().IMAutoVendorHard.Contains(itemID);
+        return !Data.GetIMSettings().IMProtectList.Contains(itemID) && Data.GetIMSettings().IMAutoVendorHard.Contains(itemID) && CompanionPolicy.Allows("Desynth", itemID);
     }
 
     private static void DesynthItem(InventoryItem* item)
     {
+        if(!CompanionPolicy.AllowsSlot("Desynth", item->Container, item->Slot)) return;
         Svc.Log.Info($"Desynthing {ExcelItemHelper.GetName(ExcelItemHelper.Get(item->ItemId), true)} [Container={item->Container},Slot={item->Slot}]");
         AgentSalvage.Instance()->SalvageItem(item);
         var retval = new AtkValue();

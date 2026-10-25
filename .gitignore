@@ -399,3 +399,8 @@ FodyWeavers.xsd
 /AutoRetainer/_build/BuildExtensions.targets
 /AutoRetainer/_build/CleanupDeps.ps1
 /AutoRetainer/_build/PostBuild.bat
+
+# Local packaging and test outputs
+artifacts/
+__pycache__/
+*.pyc

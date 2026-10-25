@@ -1,4 +1,4 @@
-﻿{
+{
   "Author": "NightmareXIV, kawaii",
   "Name": "AutoRetainer",
   "InternalName": "AutoRetainer",
@@ -8,5 +8,5 @@
   "RepoUrl": "https://github.com/PunishXIV/AutoRetainer",
   "DalamudApiLevel": 15,
   "LoadPriority": 0,
-  "IconUrl": "https://s3.puni.sh/media/plugin/24/icon-drb6aywk5m9.png"
+  "IconUrl": "https://raw.githubusercontent.com/kaldigo/AutoRetainer/master/assets/icon.png"
 }

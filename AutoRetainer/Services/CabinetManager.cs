@@ -1,4 +1,4 @@
-﻿using Dalamud.Game.Addon.Lifecycle;
+using Dalamud.Game.Addon.Lifecycle;
 using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
 using Dalamud.Game.ClientState.Objects.Types;
 using ECommons.Automation.NeoTaskManager.Tasks;
@@ -156,13 +156,14 @@ public unsafe class CabinetManager : IDisposable
                     if(item->GetConditionPercentage() == 100 && !Utils.IsProtected(item->ItemId))
                     {
                         var id = item->ItemId;
-                        if(CanItemGoIntoCabinet(id) && !storedItems.Contains(id) && !Utils.IsProtected(item->ItemId))
+                        if(CanItemGoIntoCabinet(id) && !storedItems.Contains(id) && !Utils.IsProtected(item->ItemId) && CompanionPolicy.AllowsSlot("Armoire", x, i))
                         {
                             P.TaskManager.Insert(() =>
                             {
                                 var cabItem = Cabinet.Values.FirstOrNull(x => x.Item.RowId == id);
                                 if(cabItem != null && cabItem.Value.RowId != 0 && !UIState.Instance()->Cabinet.IsItemInCabinet(cabItem.Value.RowId) && TryGetAddonByName<AtkUnitBase>("Cabinet", out var addon) && addon->IsReady())
                                 {
+                                    if(!CompanionPolicy.Allows("Armoire", id)) return true;
                                     var result = UIState.Instance()->Cabinet.StoreCabinetItem(cabItem.Value.RowId);
                                     PluginLog.Debug($"Store cabinet item {ExcelItemHelper.GetName(cabItem.Value.Item.RowId, true)}, result={result}");
                                     if(EzThrottler.Check("StoreCabinet") && EzThrottler.Throttle($"StoreCabinet{cabItem}", 2000))

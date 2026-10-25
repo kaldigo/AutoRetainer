@@ -41,6 +41,9 @@ public unsafe class MirageManager
     public IGameObject GetDresser() => Svc.Objects.FirstOrDefault(o => o.DataId.EqualsAny<uint>(2009439));
 
     public void EnqueueGoToInnAndDeliverEverything()
+        => EnqueueGoToInnAndDeliverEverything(false);
+
+    public void EnqueueGoToInnAndDeliverEverything(bool leaveOpen)
     {
         P.TaskManager.EnqueueTask(NeoTasks.ApproachObjectViaAutomove(GetDresser, 4.4f));
         P.TaskManager.EnqueueTask(NeoTasks.InteractWithObject(GetDresser));
@@ -52,13 +55,13 @@ public unsafe class MirageManager
         });
         P.TaskManager.Enqueue(() =>
         {
-            GlamourLog.EntrustAll();
+            if(GlamourLog.Available && CompanionPolicy.AllowsDresserBatch()) GlamourLog.EntrustAll();
             EzThrottler.Throttle("GlamLogBusy", 1000, true);
         });
         P.TaskManager.EnqueueDelay(1000);
         P.TaskManager.Enqueue(() =>
         {
-            if(GlamourLog.IsBusy())
+            if(GlamourLog.Available && GlamourLog.IsBusy())
             {
                 EzThrottler.Throttle("GlamLogBusy", 1000, true);
             }
@@ -66,6 +69,7 @@ public unsafe class MirageManager
         }, new(timeLimitMS:(int)TimeSpan.FromMinutes(10).TotalMilliseconds));
         P.TaskManager.Enqueue(() =>
         {
+            if(leaveOpen) return true;
             string[] addons = ["CabinetWithdraw", "MiragePrismMirageBox", "MiragePrismPrismBoxCrystallize", "MiragePrismMiragePlate"];
             var ret = true;
             foreach(var name in addons)

@@ -1,4 +1,4 @@
-﻿using AutoRetainer.Scheduler.Tasks;
+using AutoRetainer.Scheduler.Tasks;
 using ECommons.ExcelServices;
 using ECommons.Throttlers;
 using FFXIVClientStructs.FFXIV.Client.Game;
@@ -44,6 +44,7 @@ public static unsafe class InventorySpaceManager
                 DuoLog.Warning($"Slot contains different item {ExcelItemHelper.GetName(slot.ItemId)}x{slot.Quantity}, should be {Task}");
                 return true;
             }
+            if(!CompanionPolicy.AllowsSlot("Vendor", Task.InventoryType, (int)Task.Slot)) return true;
             if(!IsRetainerInventoryLoaded())
             {
                 DuoLog.Warning($"Could not find retainer inventory");
@@ -98,7 +99,7 @@ public static unsafe class InventorySpaceManager
                 var item = inv->Items[i];
                 if(item.ItemId != 0 && item.ItemId == ItemId && item.Quantity == Quantity)
                 {
-                    if(Data.GetIMSettings().IMAutoVendorSoft.Contains(item.ItemId))
+                    if(Data.GetIMSettings().IMAutoVendorSoft.Contains(item.ItemId) && CompanionPolicy.AllowsSlot("Vendor", invType, i))
                     {
                         var task = new SellSlotTask(invType, (uint)i, item.ItemId, item.Quantity);
                         PluginLog.Information($"Enqueueing {task} for soft sale");
@@ -123,7 +124,8 @@ public static unsafe class InventorySpaceManager
                 {
                     if((Data.GetIMSettings().IMAutoVendorHard.Contains(item.ItemId) || (softAsHard && Data.GetIMSettings().IMAutoVendorSoft.Contains(item.ItemId))) 
                         && !TaskDesynthItems.DesynthEligible(item.ItemId)
-                        && !S.CabinetManager.ShouldExcludeItemFromProcessing(item.ItemId))
+                        && !S.CabinetManager.ShouldExcludeItemFromProcessing(item.ItemId)
+                        && CompanionPolicy.AllowsSlot("Vendor", invType, i))
                     {
                         var task = new SellSlotTask(invType, (uint)i, item.ItemId, item.Quantity);
                         PluginLog.Information($"Enqueueing {task} for hard sale");

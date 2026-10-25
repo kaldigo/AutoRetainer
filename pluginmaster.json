@@ -1,0 +1,23 @@
+[
+  {
+    "Author": "NightmareXIV, kawaii",
+    "Name": "AutoRetainer",
+    "InternalName": "AutoRetainer",
+    "AssemblyVersion": "4.6.3.0",
+    "Description": "Collect and assign ventures to your retainers from the comfort of your bed.",
+    "ApplicableVersion": "any",
+    "RepoUrl": "https://github.com/kaldigo/AutoRetainer",
+    "DalamudApiLevel": 15,
+    "LoadRequiredState": 0,
+    "LoadSync": false,
+    "CanUnloadAsync": false,
+    "LoadPriority": 0,
+    "IconUrl": "https://raw.githubusercontent.com/kaldigo/AutoRetainer/master/assets/icon.png",
+    "Punchline": "Collect and assign ventures to your retainers from the comfort of your bed.",
+    "AcceptsFeedback": true,
+    "Changelog": "Initial Steward integration preview. Collection references, exclusions, sale rules, live policy gates, retainer withdrawals, market listing/repricing and dresser actions. AutoRetainer identity and existing workflows are preserved. Starts in dry run. Native game acceptance remains pending.",
+    "DownloadLinkInstall": "https://github.com/kaldigo/AutoRetainer/releases/download/v4.6.3.0/AutoRetainer.zip",
+    "DownloadLinkUpdate": "https://github.com/kaldigo/AutoRetainer/releases/download/v4.6.3.0/AutoRetainer.zip",
+    "DownloadLinkTesting": "https://github.com/kaldigo/AutoRetainer/releases/download/v4.6.3.0/AutoRetainer.zip"
+  }
+]

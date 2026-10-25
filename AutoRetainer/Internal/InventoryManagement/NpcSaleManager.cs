@@ -101,7 +101,7 @@ public static unsafe class NpcSaleManager
                             {
                                 Processed.Add((type, i));
                                 EzThrottler.Throttle("NpcInventoryTimeout", 5000, true);
-                                P.Memory.SellItemToShop(type, i);
+                                if(CompanionPolicy.AllowsSlot("Vendor", type, i)) P.Memory.SellItemToShop(type, i);
                             }
                             return false;
                         }

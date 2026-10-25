@@ -1,4 +1,4 @@
-﻿using AutoRetainer.Internal;
+using AutoRetainer.Internal;
 using AutoRetainer.Modules.Voyage;
 using AutoRetainer.Scheduler.Handlers;
 using AutoRetainer.Scheduler.Tasks;
@@ -683,7 +683,7 @@ public static unsafe class Utils
             var slot = &cont->Items[slotIndex];
             if(slot->ItemId == expectedItem)
             {
-                if(imPlan.IMProtectList.Contains(slot->ItemId))
+                if(imPlan.IMProtectList.Contains(slot->ItemId) || !CompanionPolicy.AllowsSlot("Discard", type, slotIndex))
                 {
                     DuoLog.Warning($"Requested discard of slot {type}[{slotIndex}], item {ExcelItemHelper.GetName(expectedItem)}, is protected, can not discard");
                 }
@@ -1236,6 +1236,7 @@ public static unsafe class Utils
 
     public static bool IsItemSellableByHardList(Number item, Number quantity)
     {
+        if(!CompanionPolicy.Allows("Vendor", (uint)item, (uint)quantity)) return false;
         if(S.CabinetManager.ShouldExcludeItemFromProcessing(item)) return false;
         if(Data.GetIMSettings().IMProtectList.Contains(item)) return false;
         if(Data.GetIMSettings().IMAutoVendorHard.Contains(item))

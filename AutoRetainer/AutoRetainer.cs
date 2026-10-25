@@ -1,4 +1,4 @@
-﻿using AutoRetainer.Internal;
+using AutoRetainer.Internal;
 using AutoRetainer.Internal.InventoryManagement;
 using AutoRetainer.Modules.Statistics;
 using AutoRetainer.Modules.Voyage;
@@ -190,6 +190,7 @@ public unsafe class AutoRetainer : IDalamudPlugin
         StatisticsManager.Init();
         AutoGCHandin.Init();
         IPC.Init();
+        CompanionPolicy.Init();
         VoyageMain.Init();
 
         NotificationMasterApi = new(Svc.PluginInterface);
@@ -720,6 +721,7 @@ public unsafe class AutoRetainer : IDalamudPlugin
             Safe(() => StatisticsManager.Shutdown());
             Safe(() => Memory.Dispose());
             Safe(() => IPC.Shutdown());
+            Safe(() => CompanionPolicy.Shutdown());
             Safe(() => API.Dispose());
             Safe(() => FPSManager.ForceRestore());
             Safe(() => PriorityManager.RestorePriority());

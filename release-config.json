@@ -1,0 +1,33 @@
+{
+  "internal_name": "AutoRetainer",
+  "repository": "kaldigo/AutoRetainer",
+  "minimum_version": "4.6.3.0",
+  "project": "AutoRetainer/AutoRetainer.csproj",
+  "build": "AutoRetainer/bin/Release",
+  "required_dlls": [
+    "AutoRetainer.dll",
+    "AutoRetainerAPI.dll",
+    "CsvHelper.dll",
+    "ECommons.dll",
+    "ECommons.IPC.dll",
+    "JetBrains.Annotations.dll",
+    "MessagePack.Annotations.dll",
+    "MessagePack.dll",
+    "Microsoft.Extensions.DependencyInjection.Abstractions.dll",
+    "Microsoft.Extensions.DependencyInjection.dll",
+    "Microsoft.NET.StringTools.dll",
+    "NightmareUI.dll",
+    "NightmareUI.OtterGuiWrapper.dll",
+    "NotificationMasterAPI.dll",
+    "OtterGui.dll",
+    "PunishLib.dll"
+  ],
+  "licenses": {
+    "LICENCE.md": "LICENSE",
+    "ECommons/LICENSE.md": "licenses/ECommons.md",
+    "PunishLib/LICENCE.md": "licenses/PunishLib.md",
+    "OtterGui/LICENSE": "licenses/OtterGui.md",
+    "NightmareUI/LICENSE": "licenses/NightmareUI.md",
+    "ECommons.IPC/LICENSE": "licenses/ECommons.IPC.md"
+  }
+}
