@@ -52,7 +52,7 @@ internal static partial class CompanionPolicy
             ()=>P.Memory.RetainerItemCommandDetour(InventorySpaceManager.AgentRetainerItemCommandModule,
                 (uint)expected.Slot,(InventoryType)expected.Container,0,RetainerItemCommand.EntrustToRetainer),1);
     }
-    private static unsafe bool EnqueueOverflow(ulong cid)
+    private static unsafe bool EnqueueOverflow(ulong cid,bool collection=false)
     {
         if(!Connected(cid)||HasFault||Utils.GetReachableRetainerBell(true)==null||!ECommons.GameHelpers.Player.IsInHomeWorld)return false;
         P.SkipNextEnable=true;
@@ -61,13 +61,13 @@ internal static partial class CompanionPolicy
         P.TaskManager.Enqueue(() =>
         {
             if(!Connected(cid)||HasFault)return true;
-            P.TaskManager.InsertStack(() => EnqueueRetainers(cid));
+            P.TaskManager.InsertStack(() => EnqueueRetainers(cid,collection));
             return true;
         },"Steward protected overflow retainers");
         P.TaskManager.Enqueue(RetainerListHandlers.CloseRetainerList);
         return true;
     }
-    private static unsafe void EnqueueRetainers(ulong cid)
+    private static unsafe void EnqueueRetainers(ulong cid,bool collection)
     {
         var rm=RetainerManager.Instance();if(rm==null||!rm->IsReady)return;
         foreach(var retainer in rm->Retainers)
@@ -76,7 +76,7 @@ internal static partial class CompanionPolicy
             var name=retainer.Name.ToString();
             P.TaskManager.Enqueue(()=>
             {
-                if(!NeedsOverflow(cid))return true;
+                if(!(collection?NeedsCollection(cid):NeedsOverflow(cid)))return true;
                 P.TaskManager.InsertStack(()=>
                 {
                     TaskSelectRetainer.Enqueue(name);
@@ -87,6 +87,12 @@ internal static partial class CompanionPolicy
                 return true;
             },"Protected overflow: "+name);
         }
+    }
+    private static bool NeedsCollection(ulong cid)
+    {
+        if(!Connected(cid)||HasFault)return false;
+        try{return Svc.PluginInterface.GetIpcSubscriber<ulong,bool>("Steward.InventoryPolicy.CollectionNeeded").InvokeFunc(cid);}
+        catch{return false;}
     }
     private static bool NeedsOverflow(ulong cid)
     {

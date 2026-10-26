@@ -29,6 +29,9 @@ internal static partial class CompanionPolicy
         ledger.Faults.UnionWith(ledger.Pending);
         if(!migrated || ledger.Owners.Count!=0 || ledger.Faults.Count!=0 || ledger.Pending.Count!=0)SavePolicy();
         ready=true;
+        Svc.PluginInterface.GetIpcProvider<uint,uint,bool>("AutoRetainer.InventoryPolicy.DisposalSelected").RegisterFunc((id,quantity)=>
+            Utils.IsItemSelectedByHardList(id,quantity)&&
+            (Data.GetIMSettings().IMEnableAutoVendor||Data.GetIMSettings().IMEnableNpcSell||Scheduler.Tasks.TaskDesynthItems.DesynthEligible(id)));
         Svc.Framework.Update+=Tick;
         Svc.PluginInterface.GetIpcProvider<int>("AutoRetainer.InventoryPolicy.Version").RegisterFunc(() => Version);
         Svc.PluginInterface.GetIpcProvider<ulong, string, bool>("AutoRetainer.InventoryPolicy.Connect").RegisterFunc(Connect);
@@ -206,6 +209,7 @@ internal static partial class CompanionPolicy
         switch(operation)
         {
             case "Overflow": return EnqueueOverflow(cid);
+            case "Collect": return EnqueueOverflow(cid,true);
             case "Armoire": S.CabinetManager.EnqueueGoToInnAndDeliverEverything(); return true;
             case "Dresser": S.MirageManager.EnqueueGoToInnAndDeliverEverything(true); return true;
             case "Vendor": Scheduler.Tasks.TaskVendorItems.EnqueueFromCommand(); return true;
@@ -279,6 +283,7 @@ internal static partial class CompanionPolicy
     internal static void Shutdown()
     {
         if(control.Active)control.Release(control.Owner);
+        Svc.PluginInterface.GetIpcProvider<uint,uint,bool>("AutoRetainer.InventoryPolicy.DisposalSelected").UnregisterFunc();
         Svc.Framework.Update-=Tick;
         if(handoffCharacter!=0){handoffCharacter=0;SchedulerMain.RetainerPostProcessLocked=false;}
         Svc.PluginInterface.GetIpcProvider<int>("AutoRetainer.InventoryPolicy.Version").UnregisterFunc();

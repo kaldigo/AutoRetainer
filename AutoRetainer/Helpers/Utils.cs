@@ -1237,6 +1237,12 @@ public static unsafe class Utils
     public static bool IsItemSellableByHardList(Number item, Number quantity)
     {
         if(!CompanionPolicy.Allows("Vendor", (uint)item, (uint)quantity)) return false;
+        return IsItemSelectedByHardList(item,quantity);
+    }
+
+    // Shared selection predicate for a companion's read-only withdrawal planning.
+    public static bool IsItemSelectedByHardList(Number item,Number quantity)
+    {
         if(S.CabinetManager.ShouldExcludeItemFromProcessing(item)) return false;
         if(Data.GetIMSettings().IMProtectList.Contains(item)) return false;
         if(Data.GetIMSettings().IMAutoVendorHard.Contains(item))
