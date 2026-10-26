@@ -21,6 +21,9 @@ PROJECT = 'AutoRetainer/AutoRetainer.csproj'
 SENSITIVE_SOURCE = {
     'AutoRetainer/AutoRetainer.cs', 'AutoRetainer/PluginData/Config.cs',
     'AutoRetainer/Internal/Memory.cs', 'AutoRetainer/Modules/CompanionPolicy.cs',
+    'AutoRetainer/Modules/CompanionStorage.cs', 'AutoRetainer/Modules/CompanionSubmission.cs',
+    'AutoRetainer/Modules/PolicyConfirmation.cs', 'AutoRetainer/Modules/PolicyLedger.cs',
+    'AutoRetainer/Modules/PolicyPersistence.cs', 'AutoRetainer/Modules/PolicyControl.cs',
     'AutoRetainer/Modules/IPC.cs', 'AutoRetainer/Global.cs',
     'AutoRetainer/Scheduler/Tasks/TaskPostprocessRetainerIPC.cs',
     'AutoRetainer/Scheduler/Tasks/TaskPostprocessCharacterIPC.cs',

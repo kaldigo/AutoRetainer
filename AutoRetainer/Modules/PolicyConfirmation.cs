@@ -31,6 +31,14 @@ internal sealed class PolicyCommitGate
 }
 
 internal enum PolicyAck { Waiting, Completed, Failed }
+internal static class PolicyTransferAcknowledgement
+{
+    internal static PolicyAck Check(PolicyAck source,long? before,long? after,uint quantity)
+    {
+        if(source==PolicyAck.Failed||before==null||after==null||quantity==0||after<before||after>before+quantity)return PolicyAck.Failed;
+        return source==PolicyAck.Completed && after==before+quantity?PolicyAck.Completed:PolicyAck.Waiting;
+    }
+}
 internal static class PolicyAcknowledgement
 {
     internal static PolicyAck Check(long before,long? current,bool dialogVisible,long submitted,long now)

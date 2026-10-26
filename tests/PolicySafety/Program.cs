@@ -129,3 +129,10 @@ try
 }
 finally{foreach(var file in Directory.GetFiles(folder))File.Delete(file);Directory.Delete(Path.Combine(folder,"blocked"));Directory.Delete(folder);}
 Console.WriteLine($"{total} safety checks passed including real ledger I/O and reload failures.");
+
+Check(PolicyTransferAcknowledgement.Check(PolicyAck.Completed,0,1,1)==PolicyAck.Completed,"Store acknowledgement requires destination gain");
+Check(PolicyTransferAcknowledgement.Check(PolicyAck.Completed,0,0,1)==PolicyAck.Waiting,"Removed source with missing destination remains pending");
+Check(PolicyTransferAcknowledgement.Check(PolicyAck.Waiting,0,1,1)==PolicyAck.Waiting,"Destination gain alone cannot acknowledge storage");
+Check(PolicyTransferAcknowledgement.Check(PolicyAck.Completed,0,2,1)==PolicyAck.Failed,"Unexpected destination gain holds for review");
+Check(PolicyTransferAcknowledgement.Check(PolicyAck.Completed,0,null,1)==PolicyAck.Failed,"Unavailable destination cannot release transaction");
+Console.WriteLine($"{total} checks passed including retainer destination acknowledgements.");

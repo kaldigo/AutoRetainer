@@ -6,7 +6,7 @@ namespace AutoRetainer.Modules;
 /// <summary>Optional, character-scoped policy. All game actions remain owned by AutoRetainer.</summary>
 internal static partial class CompanionPolicy
 {
-    internal const int Version = 5;
+    internal const int Version = 6;
     private static string callback;
     private static ulong character;
     private static long heartbeat;
@@ -38,6 +38,8 @@ internal static partial class CompanionPolicy
         Svc.PluginInterface.GetIpcProvider<ulong, string, bool>("AutoRetainer.InventoryPolicy.Run").RegisterFunc(Run);
         Svc.PluginInterface.GetIpcProvider<ulong, string, bool>("AutoRetainer.InventoryPolicy.Menu").RegisterFunc(Menu);
         Svc.PluginInterface.GetIpcProvider<ulong, string, bool>("AutoRetainer.InventoryPolicy.Retrieve").RegisterFunc(Retrieve);
+        Svc.PluginInterface.GetIpcProvider<ulong, string, bool>("AutoRetainer.InventoryPolicy.Store").RegisterFunc(Store);
+        Svc.PluginInterface.GetIpcProvider<bool>("AutoRetainer.InventoryPolicy.SubmissionPending").RegisterFunc(()=>SubmissionPending);
         Svc.PluginInterface.GetIpcProvider<ulong, bool>("AutoRetainer.InventoryPolicy.OwnsHandoff").RegisterFunc(OwnsHandoff);
         Svc.PluginInterface.GetIpcProvider<ulong, bool>("AutoRetainer.InventoryPolicy.AcquireControl").RegisterFunc(AcquireControl);
         Svc.PluginInterface.GetIpcProvider<ulong, bool>("AutoRetainer.InventoryPolicy.ReleaseControl").RegisterFunc(control.Release);
@@ -203,6 +205,7 @@ internal static partial class CompanionPolicy
         if(!Connected(cid) || HasFault || ledger.Pending.Contains(cid) || Utils.IsBusy) return false;
         switch(operation)
         {
+            case "Overflow": return EnqueueOverflow(cid);
             case "Armoire": S.CabinetManager.EnqueueGoToInnAndDeliverEverything(); return true;
             case "Dresser": S.MirageManager.EnqueueGoToInnAndDeliverEverything(true); return true;
             case "Vendor": Scheduler.Tasks.TaskVendorItems.EnqueueFromCommand(); return true;
@@ -286,6 +289,8 @@ internal static partial class CompanionPolicy
         Svc.PluginInterface.GetIpcProvider<ulong, string, bool>("AutoRetainer.InventoryPolicy.Run").UnregisterFunc();
         Svc.PluginInterface.GetIpcProvider<ulong, string, bool>("AutoRetainer.InventoryPolicy.Menu").UnregisterFunc();
         Svc.PluginInterface.GetIpcProvider<ulong, string, bool>("AutoRetainer.InventoryPolicy.Retrieve").UnregisterFunc();
+        Svc.PluginInterface.GetIpcProvider<ulong, string, bool>("AutoRetainer.InventoryPolicy.Store").UnregisterFunc();
+        Svc.PluginInterface.GetIpcProvider<bool>("AutoRetainer.InventoryPolicy.SubmissionPending").UnregisterFunc();
         Svc.PluginInterface.GetIpcProvider<ulong, bool>("AutoRetainer.InventoryPolicy.OwnsHandoff").UnregisterFunc();
         Svc.PluginInterface.GetIpcProvider<ulong, bool>("AutoRetainer.InventoryPolicy.AcquireControl").UnregisterFunc();
         Svc.PluginInterface.GetIpcProvider<ulong, bool>("AutoRetainer.InventoryPolicy.ReleaseControl").UnregisterFunc();

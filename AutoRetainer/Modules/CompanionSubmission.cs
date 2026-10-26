@@ -8,7 +8,7 @@ namespace AutoRetainer.Modules;
 internal static partial class CompanionPolicy
 {
     private sealed record Submission(ulong Character,string Action,PolicyItemIdentity Source,long Before,uint Removed,
-        ulong Retainer,uint CabinetRow,long Started);
+        ulong Retainer,uint CabinetRow,long Started,long? DestinationBefore=null);
     private static Submission submission;
     internal static bool SubmissionPending=>submission!=null && submission.Character==Svc.ClientState.LocalContentId;
     // The removed waist slot remains in the upstream enum/list, but is not a live inventory.
@@ -46,9 +46,11 @@ internal static partial class CompanionPolicy
         var source=ReadIdentity(type,slot);if(source==null || source.ItemId==0 || source.Quantity==0)return false;
         var before=CountSource(source);if(before==null)return false;
         var manager=RetainerManager.Instance();
-        var retainer=Utils.RetainerInventories.Contains(type)&&manager!=null?manager->LastSelectedRetainerId:0;
+        var retainer=(Utils.RetainerInventories.Contains(type)||action=="Store")&&manager!=null?manager->LastSelectedRetainerId:0;
+        var destination=action=="Store"?CountStored(source.ItemId,((InventoryItem.ItemFlags)source.Flags).HasFlag(InventoryItem.ItemFlags.HighQuality)):null;
+        if(action=="Store"&&(retainer==0||destination==null))return false;
         if(Utils.RetainerInventories.Contains(type)&&retainer==0)return false;
-        submission=new(Svc.ClientState.LocalContentId,action,source,before.Value,removed==0?source.Quantity:removed,retainer,cabinetRow,Environment.TickCount64);
+        submission=new(Svc.ClientState.LocalContentId,action,source,before.Value,removed==0?source.Quantity:removed,retainer,cabinetRow,Environment.TickCount64,destination);
         return PolicyPersistence.Submit(()=>{MaintainPauses();BeginTransaction();},()=>source.Matches(ReadIdentity(type,slot)) && AllowsSlot(action,type,slot,true) &&
             source.Matches(ReadIdentity(type,slot)),native,
             ex=>ReportFault(action+" submission could not be verified: "+ex.Message));
@@ -82,6 +84,12 @@ internal static partial class CompanionPolicy
             var result=PolicySlotAcknowledgement.Check(pending.Source,ReadIdentity((InventoryType)pending.Source.Container,pending.Source.Slot),
                 pending.Before,CountSource(pending.Source),pending.Removed,visible,pending.Started,Environment.TickCount64);
             if(result==PolicyAck.Failed)throw new InvalidOperationException("Source/quantity acknowledgement is missing or unexpected");
+            if(pending.Action=="Store")
+            {
+                var stored=CountStored(pending.Source.ItemId,((InventoryItem.ItemFlags)pending.Source.Flags).HasFlag(InventoryItem.ItemFlags.HighQuality));
+                result=PolicyTransferAcknowledgement.Check(result,pending.DestinationBefore,stored,pending.Removed);
+                if(result==PolicyAck.Failed)throw new InvalidOperationException("Retainer destination acknowledgement is missing or unexpected");
+            }
             if(result==PolicyAck.Completed){CompleteTransaction();submission=null;}
         }
         catch(Exception ex){ReportFault(pending.Action+" requires inventory review: "+ex.Message);}

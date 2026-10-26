@@ -56,7 +56,7 @@ class IntegrationContract(unittest.TestCase):
   self.assertIn('handoffCharacter=plugin=="Steward"?Svc.ClientState.LocalContentId:0',text)
   self.assertIn('if(handoffCharacter!=0 && !OwnsHandoff(handoffCharacter))',text)
   self.assertEqual(text.count('if(!OwnsHandoff(cid)) return false;'),2)
-  self.assertIn('internal const int Version = 5;',text)
+  self.assertIn('internal const int Version = 6;',text)
   ipc=(ROOT/'AutoRetainer/Modules/IPC.cs').read_text()
   self.assertIn('CompanionPolicy.BeginHandoff(pluginName)',ipc)
   self.assertIn('CompanionPolicy.EndHandoff()',ipc)
