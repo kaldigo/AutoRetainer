@@ -2,6 +2,16 @@ import unittest
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]/'AutoRetainer'
 class StorageBoundary(unittest.TestCase):
+ def test_managed_protection_inheritance_does_not_require_empty_defaults(self):
+  text=(ROOT/'Helpers/Utils.cs').read_text().split('public InventoryManagementSettings GetIMSettings')[1].split('public IEnumerable<InventoryType>')[0]
+  fast=text.split('var newPlan = plan.DSFClone()')[0]
+  self.assertIn('CompanionRequiredCleanupPlans.Contains(plan.GUID)',fast)
+  self.assertIn('!raw',fast)
+  for field in ['SoftSell','HardSell','Desynth','Discard']:
+   self.assertIn('!plan.AdditionMode'+field+'List',fast)
+  self.assertIn('CompanionSettings.WithInheritedProtection(plan,C.DefaultIMSettings)',fast)
+  self.assertNotIn('IMProtectList.Count==0',fast)
+
  def test_entrust_filters_before_policy_and_rechecks_at_submission(self):
   text=(ROOT/'Scheduler/Tasks/TaskEntrustDuplicates.cs').read_text()
   self.assertEqual(text.count('if(toEntrustFromStack > 0)\n                                    {\n                                        if(!global::AutoRetainer.Modules.CompanionPolicy.AllowsSlot'),2)

@@ -147,3 +147,5 @@ foreach(var desynth in new[]{false,true})
 }
 Check(PolicyDisposal.Allows("Store",true,true,true,true),"Disposal demo mode does not block collection/storage");
 Console.WriteLine($"{total} checks passed including disposal demo mode and priority.");
+SettingsChecks.Run(Check);
+Console.WriteLine($"{total} checks passed including live inherited protection without candidate-list cloning.");

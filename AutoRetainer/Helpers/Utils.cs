@@ -578,11 +578,11 @@ public static unsafe class Utils
         {
             if(C.AdditionalIMSettings.TryGetFirst(x => x.GUID == thisRef.InventoryCleanupPlan, out var plan))
             {
-                // An empty inherited protection list changes nothing. Avoid cloning the prepared
-                // equipment candidate list at every per-slot safety check.
+                // Resolve inherited protection without serializing the large prepared candidate lists.
+                // Read current settings every time: adding/removing a protection must take effect immediately.
                 if(!raw&&C.CompanionRequiredCleanupPlans.Contains(plan.GUID)&&plan.AdditionModeProtectList&&
                     !plan.AdditionModeSoftSellList&&!plan.AdditionModeHardSellList&&!plan.AdditionModeDesynthList&&
-                    !plan.AdditionModeDiscardList&&C.DefaultIMSettings.IMProtectList.Count==0)return plan;
+                    !plan.AdditionModeDiscardList)return global::AutoRetainer.Modules.CompanionSettings.WithInheritedProtection(plan,C.DefaultIMSettings);
                 if(!raw && (plan.AdditionModeProtectList || plan.AdditionModeSoftSellList || plan.AdditionModeHardSellList))
                 {
                     var newPlan = plan.DSFClone();
