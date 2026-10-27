@@ -81,9 +81,17 @@ internal static partial class CompanionPolicy
             if(pending.Action=="Desynth" && Svc.Condition[ConditionFlag.Occupied39])visible=true;
             if(pending.CabinetRow!=0 && (UIState.Instance()==null || !UIState.Instance()->Cabinet.IsCabinetLoaded() ||
                 !UIState.Instance()->Cabinet.IsItemInCabinet(pending.CabinetRow)))visible=true;
-            var result=PolicySlotAcknowledgement.Check(pending.Source,ReadIdentity((InventoryType)pending.Source.Container,pending.Source.Slot),
-                pending.Before,CountSource(pending.Source),pending.Removed,visible,pending.Started,Environment.TickCount64);
-            if(result==PolicyAck.Failed)throw new InvalidOperationException("Source/quantity acknowledgement is missing or unexpected");
+            var current=ReadIdentity((InventoryType)pending.Source.Container,pending.Source.Slot);
+            var after=CountSource(pending.Source);
+            var now=Environment.TickCount64;
+            var result=PolicySlotAcknowledgement.Check(pending.Source,current,
+                pending.Before,after,pending.Removed,visible,pending.Started,now);
+            if(result==PolicyAck.Failed)
+            {
+                Svc.Log.Warning("[Steward submission] Acknowledgement rejected: action={Action}, expected={Expected}, current={Current}, before={Before}, after={After}, removed={Removed}, busy={Busy}, elapsedMs={Elapsed}",
+                    pending.Action,pending.Source,current,pending.Before,after,pending.Removed,visible,now-pending.Started);
+                throw new InvalidOperationException("Source/quantity acknowledgement is missing or unexpected");
+            }
             if(pending.Action=="Store")
             {
                 var stored=CountStored(pending.Source.ItemId,((InventoryItem.ItemFlags)pending.Source.Flags).HasFlag(InventoryItem.ItemFlags.HighQuality));
