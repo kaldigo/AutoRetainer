@@ -43,6 +43,9 @@ class IntegrationContract(unittest.TestCase):
   confirmation=text.split('private static bool PendingAllowed(')[1].split('private static bool MatchesPendingReward')[0]
   self.assertNotIn('GetHandinItems',confirmation)
   self.assertNotIn('items[pendingIndex]',confirmation)
+  reward=text.split('private static bool MatchesPendingReward')[1].split('internal static bool IsEnabled')[0]
+  self.assertIn('PolicyDialog.MatchesItemName(expected,actual)',reward)
+  self.assertNotIn('.Cleanup()',reward)
  def test_gc_approval_is_captured_only_for_an_actual_selection(self):
   text=(ROOT/'AutoRetainer/Modules/GcHandin/AutoGCHandin.cs').read_text().split('internal static void InvokeHandin(')[1].split('internal static bool HasInInventory')[0]
   self.assertLess(text.index('FrameThrottler.Throttle'),text.index('pendingConfirmation=new'))

@@ -17,6 +17,13 @@ Check(!new PolicyConfirmation(0,42,"slot",1000).StillValid(0,42,"slot",1001,true
 Check(!new PolicyConfirmation(12,0,"slot",1000).StillValid(12,0,"slot",1001,true),"No item");
 Check(!new PolicyConfirmation(12,42,"",1000).StillValid(12,42,"",1001,true),"Empty inventory evidence");
 var endpoint="Steward.InventoryPolicy.Evaluate";
+Check(PolicyDialog.MatchesItemName("Boots of the Divine Hero","Boots of the Divine Hero"),"Recorded item 8240 reward keeps internal spaces on both sides");
+Check(PolicyDialog.MatchesItemName("Boots of the Divine Hero","  Boots of the Divine Hero\n"),"Outer dialog padding does not change item identity");
+Check(!PolicyDialog.MatchesItemName("Boots of the Divine Hero","BootsoftheDivineHero"),"Do not strip meaningful internal spaces from only the reward");
+Check(!PolicyDialog.MatchesItemName("Boots of the Divine Hero","Boots of the Divine Light"),"Another reward name is rejected");
+Check(!PolicyDialog.MatchesItemName("Boots of the Divine Hero",null),"Missing reward name is rejected");
+Check(!PolicyDialog.MatchesItemName("", ""),"Empty names cannot establish item identity");
+Check(!PolicyDialog.MatchesItemName("Boots of the Divine Hero","Deliver Boots of the Divine Hero"),"A substring is not an exact reward identity");
 // Reproduce the observed GC modal transition: approval survives the hidden list,
 // but a matching dialog alone never overrides live inventory/policy evidence.
 Check(pending.DialogStillValid(12,true,pending.Fingerprint,1047,true),"GC reward uses captured approval after its selection list disappears");

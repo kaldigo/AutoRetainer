@@ -22,6 +22,8 @@ internal static class HandoffLease
 internal static class PolicyDialog
 {
     internal static bool Matches(ushort owner,ushort parent,ushort host) => owner!=0 && (parent==owner || host==owner);
+    internal static bool MatchesItemName(string expected,string actual) =>
+        !string.IsNullOrWhiteSpace(expected) && string.Equals(expected.Trim(),actual?.Trim(),StringComparison.Ordinal);
 }
 
 internal sealed class PolicyCommitGate

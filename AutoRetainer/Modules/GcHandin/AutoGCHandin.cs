@@ -88,12 +88,18 @@ internal static unsafe class AutoGCHandin
         if(!CompanionPolicy.IsManaged)return true;
         if(pendingConfirmation==null)return false;
         var expected=ExcelItemHelper.GetName(pendingConfirmation.ItemId);
+        var observed=new List<string>();
         for(var index=0;index<addon->UldManager.NodeListCount;index++)
         {
             var node=addon->UldManager.NodeList[index];
-            if(node!=null && node->Type==NodeType.Text &&
-                ((AtkTextNode*)node)->NodeText.GetText().Cleanup().Trim()==expected)return true;
+            if(node!=null && node->Type==NodeType.Text)
+            {
+                var actual=((AtkTextNode*)node)->NodeText.GetText();
+                if(PolicyDialog.MatchesItemName(expected,actual))return true;
+                if(observed.Count<32)observed.Add(actual.Length>256?actual[..256]:actual);
+            }
         }
+        Svc.Log.Warning($"[Steward GC] Reward name mismatch: expected={Newtonsoft.Json.JsonConvert.SerializeObject(expected)}, observed={Newtonsoft.Json.JsonConvert.SerializeObject(observed)}");
         return false; // An unknown or mismatched reward dialog must not be acknowledged.
     }
 
