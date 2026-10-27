@@ -66,12 +66,21 @@ internal static unsafe class AutoGCHandin
     {
         if(!CompanionPolicy.IsManaged)return true;
         var items=GetHandinItems();
-        if(pendingConfirmation!=null && pendingIndex>=0 && pendingIndex<items.Count &&
-            pendingConfirmation.StillValid(Svc.ClientState.LocalContentId,items[pendingIndex].ItemID,
-                InventoryFingerprint(pendingConfirmation.ItemId),Environment.TickCount64,
-                !Data.GetIMSettings().IMProtectList.Contains(pendingConfirmation.ItemId) &&
-                !S.CabinetManager.ShouldExcludeItemFromProcessing(pendingConfirmation.ItemId) &&
-                CompanionPolicy.Allows("Gc",pendingConfirmation.ItemId)))return true;
+        var pending=pendingConfirmation;
+        var indexValid=pendingIndex>=0&&pendingIndex<items.Count;
+        string fingerprint=null;
+        bool? permitted=null;
+        if(pending!=null&&indexValid)
+        {
+            fingerprint=InventoryFingerprint(pending.ItemId);
+            permitted=!Data.GetIMSettings().IMProtectList.Contains(pending.ItemId) &&
+                !S.CabinetManager.ShouldExcludeItemFromProcessing(pending.ItemId) &&
+                CompanionPolicy.Allows("Gc",pending.ItemId);
+            if(pending.StillValid(Svc.ClientState.LocalContentId,items[pendingIndex].ItemID,
+                fingerprint,Environment.TickCount64,permitted.Value))return true;
+        }
+        // Capture which unchanged guard failed. Do not infer permission or confirm a different item.
+        Svc.Log.Warning($"[Steward GC] Confirmation rejected: pending item={pending?.ItemId}, index={pendingIndex}, list count={items.Count}, live row item={(indexValid?items[pendingIndex].ItemID:0)}, character matches={pending?.Character==Svc.ClientState.LocalContentId}, age ms={(pending==null?-1:Environment.TickCount64-pending.Started)}, permitted={permitted}, expected source={pending?.Fingerprint}, live source={fingerprint}, delivered={pendingDelivered}, submitted={deliveryGate.Submitted}");
         HoldPending("GC confirmation lost its item, inventory, permission or lease");
         return false;
     }
@@ -136,6 +145,7 @@ internal static unsafe class AutoGCHandin
             if(ack==PolicyAck.Waiting){if(!Operation)HoldPending("GC stopped before inventory acknowledgement");else HandleYesno();return;}
             try{CompanionPolicy.CompleteTransaction();}
             catch(Exception ex){HoldPending("GC acknowledgement journal could not be cleared: "+ex.Message);return;}
+            Svc.Log.Information($"[Steward GC] Delivery acknowledged: item={pendingConfirmation.ItemId}, before={pendingQuantity}, after={quantity}; confirmation closed and inventory decrease observed");
             pendingConfirmation=null;pendingDelivered=false;
         }
         if(Svc.Condition[ConditionFlag.OccupiedInQuestEvent] && TryGetAddonByName<AtkUnitBase>("GrandCompanySupplyList", out var addon))
@@ -413,7 +423,11 @@ internal static unsafe class AutoGCHandin
             pendingQuantity=quantity;pendingSubmitted=0;
             deliveryGate=new();hqGate=new();
         }
-        if(FrameThrottler.Throttle("AutoGCHandinCallback", 10)) Callback.Fire(addon, true, 1, which, Callback.ZeroAtkValue);
+        if(FrameThrottler.Throttle("AutoGCHandinCallback", 10))
+        {
+            if(CompanionPolicy.IsManaged)Svc.Log.Information($"[Steward GC] Selection submitted: item={pendingConfirmation?.ItemId}, index={which}, list count={liveItems.Count}, source={pendingConfirmation?.Fingerprint}");
+            Callback.Fire(addon, true, 1, which, Callback.ZeroAtkValue);
+        }
     }
 
     internal static bool HasInInventory(uint itemID)

@@ -38,7 +38,8 @@ class IntegrationContract(unittest.TestCase):
   text=(ROOT/'AutoRetainer/Modules/GcHandin/AutoGCHandin.cs').read_text()
   self.assertLess(text.index('if(!PendingAllowed())return false;'),text.index('new AddonMaster.GrandCompanySupplyReward(addon).Deliver()'))
   self.assertIn('!pendingDelivered || !PendingAllowed()',text)
-  self.assertIn('InventoryFingerprint(pendingConfirmation.ItemId)',text)
+  self.assertIn('var pending=pendingConfirmation;',text)
+  self.assertIn('InventoryFingerprint(pending.ItemId)',text)
  def test_quick_sell_and_low_level_sales_are_gated(self):
   text=(ROOT/'AutoRetainer/Modules/QuickSellItems.cs').read_text()
   self.assertIn('!CompanionPolicy.AllowsSlot("Vendor"',text)
