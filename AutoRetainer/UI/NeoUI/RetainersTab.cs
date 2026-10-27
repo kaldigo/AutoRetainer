@@ -17,8 +17,30 @@ public class RetainersTab : NeoUIEntry
     public RetainersTab()
     {
         Builder = new NuiBuilder()
+                 .Section("Storage destination")
+                 .Widget(StorageDestinationWidget)
                  .Section("Mass configuration change")
                  .Widget(MassConfigurationChangeWidget);
+    }
+
+    private void StorageDestinationWidget()
+    {
+        ImGui.TextWrapped("Choose the currency and nonmarketable destination for each character. Gear and housing follow ordinary entrust categories regardless of marketability.");
+        foreach(var character in C.OfflineData.Where(c=>c.RetainerData.Count>0))
+        {
+            ImGui.PushID(character.CID.ToString());
+            var selected=C.CompanionCurrencyRetainers.GetValueOrDefault(character.CID);
+            var name=character.RetainerData.FirstOrDefault(r=>r.RetainerID==selected)?.Name??"Use entrust plans only";
+            if(ImGui.BeginCombo(Censor.Character(character.Name,character.World)+"##currency",name))
+            {
+                if(ImGui.Selectable("Use entrust plans only",selected==0))C.CompanionCurrencyRetainers[character.CID]=0;
+                foreach(var retainer in character.RetainerData.Where(r=>!C.CompanionGilOnlyRetainers.Contains(r.RetainerID)))
+                    if(ImGui.Selectable(Censor.Retainer(retainer.Name),selected==retainer.RetainerID))C.CompanionCurrencyRetainers[character.CID]=retainer.RetainerID;
+                ImGui.EndCombo();
+            }
+            ImGui.PopID();
+        }
+        ImGui.TextWrapped("The chosen retainer also needs an entrust plan covering the items it should accept.");
     }
 
     private void MassConfigurationChangeWidget()

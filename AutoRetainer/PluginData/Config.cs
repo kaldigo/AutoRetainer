@@ -11,6 +11,7 @@ internal unsafe class Config
     public HashSet<Guid> CompanionRequiredCleanupPlans = [];
     public HashSet<ulong> CompanionGcFirstCharacters = [];
     public HashSet<ulong> CompanionGilOnlyRetainers = [];
+    public Dictionary<ulong, ulong> CompanionCurrencyRetainers = [];
     public Dictionary<ulong, string> CompanionPolicyOwners = [];
     public HashSet<ulong> CompanionPolicyFaults = [];
     public HashSet<ulong> CompanionPolicyPending = [];

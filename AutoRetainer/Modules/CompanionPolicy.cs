@@ -43,7 +43,9 @@ internal static partial class CompanionPolicy
             (GcDisposalCandidate(id)||Data.GetIMSettings().IMEnableAutoVendor||Data.GetIMSettings().IMEnableNpcSell||DesynthDisposalEligible(id)));
         Svc.PluginInterface.GetIpcProvider<uint,uint,string>("AutoRetainer.InventoryPolicy.DisposalPreview").RegisterFunc(DisposalPreview);
         Svc.Framework.Update+=Tick;
-        Svc.PluginInterface.GetIpcProvider<int>("AutoRetainer.InventoryPolicy.StorageVersion").RegisterFunc(()=>3);
+        Svc.PluginInterface.GetIpcProvider<int>("AutoRetainer.InventoryPolicy.StorageVersion").RegisterFunc(()=>4);
+        Svc.PluginInterface.GetIpcProvider<ulong,ulong,bool>("AutoRetainer.InventoryPolicy.MigrateStorageRouting").RegisterFunc(MigrateStorageRouting);
+        Svc.PluginInterface.GetIpcProvider<ulong,string,bool>("AutoRetainer.InventoryPolicy.StoragePlanAllows").RegisterFunc(StoragePlanAllows);
         Svc.PluginInterface.GetIpcProvider<int>("AutoRetainer.InventoryPolicy.Version").RegisterFunc(() => Version);
         Svc.PluginInterface.GetIpcProvider<ulong, string, bool>("AutoRetainer.InventoryPolicy.Connect").RegisterFunc(Connect);
         Svc.PluginInterface.GetIpcProvider<ulong, string, bool>("AutoRetainer.InventoryPolicy.Heartbeat").RegisterFunc(Pulse);
@@ -63,11 +65,21 @@ internal static partial class CompanionPolicy
         Svc.PluginInterface.GetIpcProvider<ulong,string,object>("AutoRetainer.InventoryPolicy.Hold").RegisterAction((cid,reason)=>{if(Connected(cid))ReportFault(reason,false);});
     }
     private static bool DesynthDisposalEligible(uint id)=>Scheduler.Tasks.TaskDesynthItems.DesynthEligible(id);
+    internal static bool NonEquipmentDisposalSelected(uint id)
+    {
+        var cid=Svc.ClientState.LocalContentId;
+        if(!UsesStewardCleanupPlan||!Connected(cid)||!Svc.Data.GetExcelSheet<Lumina.Excel.Sheets.Item>().TryGetRow(id,out var item)||item.EquipSlotCategory.RowId!=0)return false;
+        try{return Svc.PluginInterface.GetIpcSubscriber<ulong,uint,bool>("Steward.InventoryPolicy.NonEquipmentDisposalSelected").InvokeFunc(cid,id);}
+        catch{return false;}
+    }
     private static string DisposalPreview(uint id,uint quantity)
     {
         if(!IsManaged||!Connected(Svc.ClientState.LocalContentId))return "AutoRetainer companion unavailable; held";
-        if(!Utils.IsItemSelectedByHardList(id,quantity))return "Not selected by AutoRetainer cleanup plan";
         var mode=Data.GetIMSettings();
+        if(!Utils.IsItemSelectedByHardList(id,quantity))
+            return NonEquipmentDisposalSelected(id)&&!mode.IMAutoVendorHardIgnoreStack.Contains(id)&&quantity>=mode.IMAutoVendorHardStackLimit
+                ?$"Held by AutoRetainer stack limit: {quantity} in source; requires fewer than {mode.IMAutoVendorHardStackLimit}"
+                :"Not selected by AutoRetainer cleanup plan";
         var method=GcDisposalCandidate(id)?"GC delivery":DesynthDisposalEligible(id)?"Desynthesis":
             mode.IMEnableAutoVendor||mode.IMEnableNpcSell?"Selling":"No enabled disposal method";
         return method+(mode.IMDry?"; AutoRetainer demo mode blocks disposal":"; subject to native checks and Steward approval");
@@ -239,6 +251,7 @@ internal static partial class CompanionPolicy
         if(inv == null || !inv->IsLoaded || slot < 0 || slot >= inv->Size) return false;
         var item = inv->GetInventorySlot(slot);
         if(item==null || item->ItemId==0 || item->Quantity<=0)return false;
+        if(action=="Entrust"&&!StorageScopeAllows(Svc.ClientState.LocalContentId,RetainerManager.Instance()==null?0:RetainerManager.Instance()->LastSelectedRetainerId,item->ItemId))return false;
         var expected=new PolicyItemIdentity(item->ItemId,(uint)item->Quantity,(uint)container,slot,(int)item->Flags);
         if(Data.GetIMSettings().IMProtectList.Contains(expected.ItemId))return false;
         if(!Allows(action,expected.ItemId,expected.Quantity,(int)container,slot,ownSubmission))return false;
@@ -342,6 +355,8 @@ internal static partial class CompanionPolicy
         Svc.Framework.Update-=Tick;
         if(handoffCharacter!=0){handoffCharacter=0;SchedulerMain.RetainerPostProcessLocked=false;}
         Svc.PluginInterface.GetIpcProvider<int>("AutoRetainer.InventoryPolicy.StorageVersion").UnregisterFunc();
+        Svc.PluginInterface.GetIpcProvider<ulong,ulong,bool>("AutoRetainer.InventoryPolicy.MigrateStorageRouting").UnregisterFunc();
+        Svc.PluginInterface.GetIpcProvider<ulong,string,bool>("AutoRetainer.InventoryPolicy.StoragePlanAllows").UnregisterFunc();
         Svc.PluginInterface.GetIpcProvider<int>("AutoRetainer.InventoryPolicy.Version").UnregisterFunc();
         Svc.PluginInterface.GetIpcProvider<ulong, string, bool>("AutoRetainer.InventoryPolicy.Connect").UnregisterFunc();
         Svc.PluginInterface.GetIpcProvider<ulong, string, bool>("AutoRetainer.InventoryPolicy.Heartbeat").UnregisterFunc();

@@ -33,6 +33,10 @@ public static unsafe class RetainerConfig
         {
             ImGui.OpenPopup($"CopyEntrustPlanTo");
         }
+        var currencyStorage=C.CompanionCurrencyRetainers.GetValueOrDefault(data.CID)==ret.RetainerID;
+        if(ImGui.Checkbox("Currency and nonmarketable storage destination",ref currencyStorage))
+            C.CompanionCurrencyRetainers[data.CID]=currencyStorage?ret.RetainerID:0;
+        ImGuiEx.HelpMarker("Routes currencies and nonmarketable items here, except gear and housing. Gear and housing follow the entrust categories regardless of marketability. Requires a matching entrust plan. Only one retainer per character can have this role.");
         if(ImGui.BeginPopup("CopyEntrustPlanTo"))
         {
             if(ImGui.Selectable("To all other retainers of this character"))

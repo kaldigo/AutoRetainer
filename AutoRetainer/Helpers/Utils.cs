@@ -1251,7 +1251,7 @@ public static unsafe class Utils
     {
         if(S.CabinetManager.ShouldExcludeItemFromProcessing(item)) return false;
         if(Data.GetIMSettings().IMProtectList.Contains(item)) return false;
-        if(Data.GetIMSettings().IMAutoVendorHard.Contains(item))
+        if(Data.GetIMSettings().IMAutoVendorHard.Contains(item)||CompanionPolicy.NonEquipmentDisposalSelected((uint)item))
         {
             if(Data.GetIMSettings().IMAutoVendorHardIgnoreStack.Contains(item)) return true;
             return quantity < Data.GetIMSettings().IMAutoVendorHardStackLimit;

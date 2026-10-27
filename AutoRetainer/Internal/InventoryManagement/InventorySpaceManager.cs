@@ -123,7 +123,7 @@ public static unsafe class InventorySpaceManager
                 var item = inv->Items[i];
                 if(item.ItemId != 0 && (item.Quantity < Data.GetIMSettings().IMAutoVendorHardStackLimit || Data.GetIMSettings().IMAutoVendorHardIgnoreStack.Contains(item.ItemId)))
                 {
-                    if((Data.GetIMSettings().IMAutoVendorHard.Contains(item.ItemId) || (softAsHard && Data.GetIMSettings().IMAutoVendorSoft.Contains(item.ItemId))) 
+                    if((Data.GetIMSettings().IMAutoVendorHard.Contains(item.ItemId) || CompanionPolicy.NonEquipmentDisposalSelected(item.ItemId) || (softAsHard && Data.GetIMSettings().IMAutoVendorSoft.Contains(item.ItemId)))
                         && !TaskDesynthItems.DesynthEligible(item.ItemId)
                         && !S.CabinetManager.ShouldExcludeItemFromProcessing(item.ItemId)
                         && CompanionPolicy.AllowsSlot("Vendor", invType, i))

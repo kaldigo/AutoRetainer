@@ -51,6 +51,7 @@ internal static partial class CompanionPolicy
     private static unsafe bool Store(ulong cid,string request)
     {
         if(!OwnsHandoff(cid)||SubmissionPending||ledger.Pending.Contains(cid)||HasFault)return false;
+        if(!StoragePlanAllows(cid,request))return false;
         var expected=JsonConvert.DeserializeObject<Retrieval>(request);
         if(expected==null||expected.Quantity!=1||!PolicyPlayerInventories.Contains((InventoryType)expected.Container))return false;
         var rm=RetainerManager.Instance();var im=InventoryManager.Instance();

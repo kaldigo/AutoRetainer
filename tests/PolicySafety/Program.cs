@@ -210,5 +210,31 @@ foreach(var level in new[]{0,29,30,100})
     Check(eligible==(unlocked&&enabled&&supported&&level>=30),"Desynthesis requires unlock, enabled method, supported item and crafting level");
     Check(PolicyDisposal.Allows("Vendor",false,true,false,eligible)==!eligible,"Vendor route and desynthesis reservation agree, including locked quest");
 }
+foreach(var marketable in new[]{false,true})
+{
+    Check(PolicyStorageRouting.Allows(2,10,false,marketable,44)==marketable,"Medicine follows assigned plan when marketable, currency role otherwise");
+    Check(PolicyStorageRouting.Allows(2,2,false,marketable,44)==!marketable,"Currency role does not collect marketable medicine");
+    foreach(var category in new uint[]{1,11,35,43})
+    {
+        Check(PolicyStorageRouting.Allows(2,10,true,marketable,category),"Gear stays with native plan regardless of marketability");
+        Check(!PolicyStorageRouting.Allows(2,2,true,marketable,category),"Currency role cannot collect gear");
+    }
+    foreach(var category in new uint[]{57,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,82,95})
+    {
+        Check(PolicyStorageRouting.Allows(2,12,false,marketable,category),"Housing stays with native plan regardless of marketability");
+        Check(!PolicyStorageRouting.Allows(2,2,false,marketable,category),"Currency role cannot collect housing");
+    }
+    Check(PolicyStorageRouting.Allows(2,2,false,marketable,100),"Currencies use configured native storage role");
+    Check(!PolicyStorageRouting.Allows(2,10,false,marketable,100),"Currencies do not leak to another native plan");
+    Check(PolicyStorageRouting.Allows(0,10,false,marketable,44),"Disabling special role leaves native plans authoritative");
+}
+Check(PolicyStorageRouting.Selects(false,0,0,30,false,false,null,999),"Medicine category selected by native plan");
+Check(!PolicyStorageRouting.Selects(true,30,0,30,false,false,null,999),"Explicit item reserve overrides category selection");
+Check(PolicyStorageRouting.Selects(true,29,null,30,false,false,null,999),"Native item list permits only quantity above reserve");
+Check(!PolicyStorageRouting.Selects(false,0,null,30,false,false,null,999),"Unassigned item is not an overflow destination");
+Check(!PolicyStorageRouting.Selects(false,0,null,30,true,false,null,999),"Unknown retainer contents cannot authorize duplicate overflow");
+Check(PolicyStorageRouting.Selects(false,0,null,30,true,false,5,999),"Duplicate-only plan requires an existing live stack");
+Check(!PolicyStorageRouting.Selects(false,0,null,30,true,false,999,999),"Full duplicate stack stays held");
+Check(PolicyStorageRouting.Selects(false,0,null,30,true,true,999,999),"Multi-stack duplicate option is respected");
 SettingsChecks.Run(Check);
 Console.WriteLine($"{total} checks passed including live inherited protection without candidate-list cloning.");

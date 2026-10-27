@@ -1,3 +1,7 @@
+## 4.6.3.21
+
+Make AutoRetainer the sole storage-routing authority with read-only live plan eligibility for Steward overflow and one-time migration of the currency/nonmarketable role into AutoRetainer settings. Preserve native entrust execution and protection checks. Prepared managed cleanup plans can select explicitly permitted non-equipment categories through Steward; retain native methods and stack limits, and explain stack-limit holds in previews.
+
 Add exact source-slot, aggregate quantity, busy-state and elapsed-time diagnostics for rejected disposal acknowledgements. The 11:06 desynthesis of Goatskin Cesti succeeded according to the player but failed acknowledgement; this diagnostic change does not relax validation or claim to fix that failure.
 
 Fix batch cleanup stopping after GC when desynthesis is locked. Share the quest-aware desynthesis eligibility check between companion routing and the existing vendor queue, so an item cannot be routed to selling and simultaneously reserved for unavailable desynthesis. Preserve item approvals and no-progress stops. Add unlock/method/level routing regressions. Full native rerun remains pending.

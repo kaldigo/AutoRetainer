@@ -51,7 +51,7 @@ public static unsafe class TaskDesynthItems
             for(var i = 0; i < cont->Size; ++i)
             {
                 var item = cont->GetInventorySlot(i);
-                if(IsOnIMList(item->ItemId) && DesynthEligible(item->ItemId) && !S.CabinetManager.ShouldExcludeItemFromProcessing(item->ItemId))
+                if(IsOnIMList(item->ItemId,item->Quantity) && DesynthEligible(item->ItemId) && !S.CabinetManager.ShouldExcludeItemFromProcessing(item->ItemId))
                 {
                     items.Add(item);
                 }
@@ -69,9 +69,10 @@ public static unsafe class TaskDesynthItems
             PlayerState.Instance()->ClassJobLevels[item.Value.ClassJobRepair.Value.ExpArrayIndex]);
     }
 
-    private static bool IsOnIMList(uint itemID)
+    private static bool IsOnIMList(uint itemID,int quantity)
     {
-        return !Data.GetIMSettings().IMProtectList.Contains(itemID) && Data.GetIMSettings().IMAutoVendorHard.Contains(itemID) && CompanionPolicy.Allows("Desynth", itemID);
+        return !Data.GetIMSettings().IMProtectList.Contains(itemID) &&
+            (Data.GetIMSettings().IMAutoVendorHard.Contains(itemID)||Utils.IsItemSelectedByHardList(itemID,quantity)) && CompanionPolicy.Allows("Desynth", itemID);
     }
 
     private static void DesynthItem(InventoryItem* item)
