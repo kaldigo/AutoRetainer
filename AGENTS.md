@@ -1,3 +1,9 @@
 # Maintained AutoRetainer integration fork
 
 Preserve AutoRetainer assembly, InternalName, display name, commands, configuration and existing IPC identity. Keep upstream functionality. Only add the optional Steward inventory policy boundary, recoloured upstream icon and checked release/update infrastructure. Never modify pinned submodules to chase dependency updates. Native acceptance must be reported separately from builds and logic tests. Do not submit AI-generated contributions to PunishXIV upstream; its CONTRIBUTING.md prohibits them.
+
+Steward-managed ordinary entrust/retrieval must consult the per-slot companion policy at candidate selection, command submission and numeric confirmation. Keep the existing upstream executor. Carry selected retainer identity in policy requests. Gil-only retainers skip ventures, storage, vendor and postprocess; gil withdrawal must recheck permission at confirmation, including log-only denial.
+
+A gil-only retainer may run only Steward postprocessing when the optional StrategyRetainer IPC explicitly opts that exact retainer into an executing strategy. Keep the five-minute visit throttle, skip ventures and all other item work, and deny unavailable strategy IPC. StorageVersion 2 advertises this capability.
+
+StorageVersion 3 applies IMDry to all managed GC/desynthesis/vendor submissions. Character-scoped GC-first routing holds potential GC gear for native GC acceptance, then prefers eligible desynthesis over selling. Prepared Steward cleanup plans require a connected managed policy even if a user detaches the character; do not allow their broad equipment candidate lists to execute without Steward. Other upstream plans keep their existing behavior.

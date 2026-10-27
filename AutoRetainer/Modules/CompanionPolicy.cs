@@ -1,3 +1,5 @@
+using ECommons.ExcelServices;
+using ECommons.ExcelServices.Sheets;
 using Newtonsoft.Json;
 using FFXIVClientStructs.FFXIV.Client.Game;
 
@@ -18,6 +20,7 @@ internal static partial class CompanionPolicy
     internal static bool ControlActive => control.Active;
     internal static string Status = "No companion connected";
     internal static bool IsManaged => ledger.Owners.ContainsKey(Svc.ClientState.LocalContentId);
+    internal static bool UsesStewardCleanupPlan => Data!=null&&C.CompanionRequiredCleanupPlans.Contains(Data.GetIMSettings().GUID);
     internal static bool HasFault => IsManaged && ledger.Faults.Contains(Svc.ClientState.LocalContentId);
 
     internal static void Init()
@@ -30,9 +33,11 @@ internal static partial class CompanionPolicy
         if(!migrated || ledger.Owners.Count!=0 || ledger.Faults.Count!=0 || ledger.Pending.Count!=0)SavePolicy();
         ready=true;
         Svc.PluginInterface.GetIpcProvider<uint,uint,bool>("AutoRetainer.InventoryPolicy.DisposalSelected").RegisterFunc((id,quantity)=>
-            Utils.IsItemSelectedByHardList(id,quantity)&&
-            (Data.GetIMSettings().IMEnableAutoVendor||Data.GetIMSettings().IMEnableNpcSell||Scheduler.Tasks.TaskDesynthItems.DesynthEligible(id)));
+            !Data.GetIMSettings().IMDry&&Utils.IsItemSelectedByHardList(id,quantity)&&
+            (GcDisposalCandidate(id)||Data.GetIMSettings().IMEnableAutoVendor||Data.GetIMSettings().IMEnableNpcSell||DesynthDisposalEligible(id)));
+        Svc.PluginInterface.GetIpcProvider<uint,uint,string>("AutoRetainer.InventoryPolicy.DisposalPreview").RegisterFunc(DisposalPreview);
         Svc.Framework.Update+=Tick;
+        Svc.PluginInterface.GetIpcProvider<int>("AutoRetainer.InventoryPolicy.StorageVersion").RegisterFunc(()=>3);
         Svc.PluginInterface.GetIpcProvider<int>("AutoRetainer.InventoryPolicy.Version").RegisterFunc(() => Version);
         Svc.PluginInterface.GetIpcProvider<ulong, string, bool>("AutoRetainer.InventoryPolicy.Connect").RegisterFunc(Connect);
         Svc.PluginInterface.GetIpcProvider<ulong, string, bool>("AutoRetainer.InventoryPolicy.Heartbeat").RegisterFunc(Pulse);
@@ -51,6 +56,36 @@ internal static partial class CompanionPolicy
         Svc.PluginInterface.GetIpcProvider<ulong, bool>("AutoRetainer.InventoryPolicy.ClearFault").RegisterFunc(ClearFault);
         Svc.PluginInterface.GetIpcProvider<ulong,string,object>("AutoRetainer.InventoryPolicy.Hold").RegisterAction((cid,reason)=>{if(Connected(cid))ReportFault(reason,false);});
     }
+    private static bool DesynthDisposalEligible(uint id)=>QuestManager.IsQuestComplete(65688)&&Scheduler.Tasks.TaskDesynthItems.DesynthEligible(id);
+    private static string DisposalPreview(uint id,uint quantity)
+    {
+        if(!IsManaged||!Connected(Svc.ClientState.LocalContentId))return "AutoRetainer companion unavailable; held";
+        if(!Utils.IsItemSelectedByHardList(id,quantity))return "Not selected by AutoRetainer cleanup plan";
+        var mode=Data.GetIMSettings();
+        var method=GcDisposalCandidate(id)?"GC delivery":DesynthDisposalEligible(id)?"Desynthesis":
+            mode.IMEnableAutoVendor||mode.IMEnableNpcSell?"Selling":"No enabled disposal method";
+        return method+(mode.IMDry?"; AutoRetainer demo mode blocks disposal":"; subject to native checks and Steward approval");
+    }
+    private static bool GcDisposalCandidate(uint id)
+    {
+        var item=ExcelItemHelper.Get(id);
+        // The same conservative eligibility screen as the upstream GC workflow.
+        // The native GC list remains the final authority; never downgrade held GC candidates to vendor.
+        return item.HasValue&&Data.GCDeliveryType!=AutoRetainerAPI.Configuration.GCDeliveryType.Disabled&&
+            item.Value.ItemUICategory.RowId.EqualsAny([.. Utils.ArmorsUICategories,.. Utils.WeaponsUICategories])&&
+            item.Value.GetRarity().EqualsAny(ItemRarity.Green,ItemRarity.Pink,ItemRarity.Blue)&&item.Value.Desynth>0;
+    }
+    private static bool DisposalMethodAllows(string action,uint id)=>action is not ("Gc" or "Desynth" or "Vendor")||PolicyDisposal.Allows(action,Data.GetIMSettings().IMDry,
+        C.CompanionGcFirstCharacters.Contains(Svc.ClientState.LocalContentId),GcDisposalCandidate(id),
+        DesynthDisposalEligible(id));
+    private static readonly Dictionary<ulong,long> strategyVisits=[];
+    internal static bool StrategyDue(ulong retainer)
+    {
+        if(!IsManaged||!Connected(Svc.ClientState.LocalContentId)||HasFault||Environment.TickCount64-strategyVisits.GetValueOrDefault(retainer,long.MinValue/2)<300000)return false;
+        try{return Svc.PluginInterface.GetIpcSubscriber<ulong,bool>("Steward.InventoryPolicy.StrategyRetainer").InvokeFunc(retainer);}
+        catch{return false;}
+    }
+    internal static void MarkStrategyVisit(ulong retainer)=>strategyVisits[retainer]=Environment.TickCount64;
     private static string PolicyPath=>System.IO.Path.Combine(Svc.PluginInterface.GetPluginConfigDirectory(),"steward-policy.json");
     private static PolicyLedger CapturePolicy()=>new(){Owners=new(ledger.Owners),Faults=new(ledger.Faults),Pending=new(ledger.Pending)};
     private static void SavePolicy()=>AtomicState.Write(PolicyPath,CapturePolicy());
@@ -158,12 +193,13 @@ internal static partial class CompanionPolicy
     }
 
     /// <summary>Checked at both candidate selection and submission. Explicit upstream protections win.</summary>
-    internal static bool Allows(string action, uint itemId, uint quantity = 1, int container = -1, int slot = -1,bool ownSubmission=false)
+    internal static unsafe bool Allows(string action, uint itemId, uint quantity = 1, int container = -1, int slot = -1,bool ownSubmission=false)
     {
         if(!ready || ControlActive || HasFault || submission!=null&&!ownSubmission)return false;
         var cid = Svc.ClientState.LocalContentId;
         if(cid == 0) return false;
-        if(!ledger.Owners.TryGetValue(cid, out var owner)) return true;
+        if(!ledger.Owners.TryGetValue(cid, out var owner))
+            return action is not ("Gc" or "Desynth" or "Vendor")||!C.CompanionRequiredCleanupPlans.Contains(Data.GetIMSettings().GUID);
         if(ledger.Pending.Contains(cid) && action!="Gc" && !ownSubmission)return false;
         if(character != cid || callback != owner || Environment.TickCount64 - heartbeat > 5000)
         {
@@ -172,10 +208,12 @@ internal static partial class CompanionPolicy
         }
         try
         {
-            var request = JsonConvert.SerializeObject(new { Version, Character = cid, Action = action, ItemId = itemId, Quantity = quantity, Container = container, Slot = slot });
+            var manager=RetainerManager.Instance();
+            var Retainer=manager==null?0:manager->LastSelectedRetainerId;
+            var request = JsonConvert.SerializeObject(new { Retainer, Version, Character = cid, Action = action, ItemId = itemId, Quantity = quantity, Container = container, Slot = slot });
             var result = Svc.PluginInterface.GetIpcSubscriber<string, string>(callback).InvokeFunc(request);
             // Only an explicit allow authorizes an action. Invalid/unknown responses hold the item.
-            return result == "Allow" && Connected(cid) && callback==owner && IsManaged && !HasFault && !ControlActive;
+            return result == "Allow" && Connected(cid) && DisposalMethodAllows(action,itemId) && callback==owner && IsManaged && !HasFault && !ControlActive;
         }
         catch(Exception ex)
         {
@@ -206,6 +244,7 @@ internal static partial class CompanionPolicy
     private static bool Run(ulong cid, string operation)
     {
         if(!Connected(cid) || HasFault || ledger.Pending.Contains(cid) || Utils.IsBusy) return false;
+        if(operation is "Gc" or "Desynth" or "Vendor" && Data.GetIMSettings().IMDry)return false;
         switch(operation)
         {
             case "Overflow": return EnqueueOverflow(cid);
@@ -214,7 +253,7 @@ internal static partial class CompanionPolicy
             case "Dresser": S.MirageManager.EnqueueGoToInnAndDeliverEverything(true); return true;
             case "Vendor": Scheduler.Tasks.TaskVendorItems.EnqueueFromCommand(); return true;
             case "Desynth": if(!Data.GetIMSettings().IMEnableItemDesynthesis) return false; Scheduler.Tasks.TaskDesynthItems.Enqueue(); return true;
-            case "Gc": GCContinuation.EnqueueInitiation(true); return true;
+            case "Gc": return Scheduler.Tasks.TaskDeliverItems.Enqueue();
             default: return false;
         }
     }
@@ -284,8 +323,10 @@ internal static partial class CompanionPolicy
     {
         if(control.Active)control.Release(control.Owner);
         Svc.PluginInterface.GetIpcProvider<uint,uint,bool>("AutoRetainer.InventoryPolicy.DisposalSelected").UnregisterFunc();
+        Svc.PluginInterface.GetIpcProvider<uint,uint,string>("AutoRetainer.InventoryPolicy.DisposalPreview").UnregisterFunc();
         Svc.Framework.Update-=Tick;
         if(handoffCharacter!=0){handoffCharacter=0;SchedulerMain.RetainerPostProcessLocked=false;}
+        Svc.PluginInterface.GetIpcProvider<int>("AutoRetainer.InventoryPolicy.StorageVersion").UnregisterFunc();
         Svc.PluginInterface.GetIpcProvider<int>("AutoRetainer.InventoryPolicy.Version").UnregisterFunc();
         Svc.PluginInterface.GetIpcProvider<ulong, string, bool>("AutoRetainer.InventoryPolicy.Connect").UnregisterFunc();
         Svc.PluginInterface.GetIpcProvider<ulong, string, bool>("AutoRetainer.InventoryPolicy.Heartbeat").UnregisterFunc();

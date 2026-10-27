@@ -70,13 +70,17 @@ internal static partial class CompanionPolicy
     private static unsafe void EnqueueRetainers(ulong cid,bool collection)
     {
         var rm=RetainerManager.Instance();if(rm==null||!rm->IsReady)return;
-        foreach(var retainer in rm->Retainers)
+        foreach(var retainer in Internal.GameRetainerManager.Retainers)
         {
-            if(!retainer.Available||retainer.RetainerId==0)continue;
-            var name=retainer.Name.ToString();
+            if(!retainer.Handle.Available||C.CompanionGilOnlyRetainers.Contains(retainer.RetainerID))continue;
+            var name=retainer.Name;
+            var retainerId=retainer.RetainerID;
+            if(string.IsNullOrWhiteSpace(name))continue;
             P.TaskManager.Enqueue(()=>
             {
                 if(!(collection?NeedsCollection(cid):NeedsOverflow(cid)))return true;
+                Svc.Log.Information("Steward {Operation}: selecting retainer {RetainerName} ({RetainerId})",
+                    collection?"collection":"overflow",name,retainerId);
                 P.TaskManager.InsertStack(()=>
                 {
                     TaskSelectRetainer.Enqueue(name);
@@ -85,7 +89,7 @@ internal static partial class CompanionPolicy
                     P.TaskManager.Enqueue(RetainerHandlers.ConfirmCantBuyback);
                 });
                 return true;
-            },"Protected overflow: "+name);
+            },(collection?"Steward collection: ":"Steward overflow: ")+name);
         }
     }
     private static bool NeedsCollection(ulong cid)

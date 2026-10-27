@@ -15,6 +15,16 @@ namespace AutoRetainer.Scheduler.Tasks;
 
 internal static unsafe class TaskEntrustDuplicates
 {
+    private static InventoryType pendingStorageType;
+    private static int pendingStorageSlot;
+    private static uint pendingStorageItem;
+    private static int pendingStorageQuantity;
+    private static bool StorageConfirmationAllowed()
+    {
+        var slot=InventoryManager.Instance()->GetInventorySlot(pendingStorageType,pendingStorageSlot);
+        return slot!=null&&slot->ItemId==pendingStorageItem&&slot->Quantity==pendingStorageQuantity&&
+            global::AutoRetainer.Modules.CompanionPolicy.AllowsSlot(pendingStorageType.EqualsAny(Utils.RetainerEntireInventory)?"Retrieve":"Entrust",pendingStorageType,pendingStorageSlot);
+    }
     internal static int RequestEntrustQuantity = 0;
     internal static List<(uint ID, uint Quantity)> CapturedInventoryState = [];
     internal static bool WasOpen = false;
@@ -49,6 +59,7 @@ internal static unsafe class TaskEntrustDuplicates
             {
                 if(IsAddonReady(numeric))
                 {
+                    if(!StorageConfirmationAllowed()){Callback.Fire(numeric,true,-1);return true;}
                     var maxAmount = numeric->AtkValues[3].UInt;
                     var result = Math.Clamp(RequestEntrustQuantity, 1, maxAmount);
                     if(EzThrottler.Throttle("EntrustItemInputNumeric", 200))
@@ -118,6 +129,7 @@ internal static unsafe class TaskEntrustDuplicates
                         var item = InventoryManager.Instance()->GetInventorySlot(type, i);
                         if(item->ItemId != 0 && item->Quantity > 0)
                         {
+                            if(!global::AutoRetainer.Modules.CompanionPolicy.AllowsSlot(type.EqualsAny(Utils.RetainerEntireInventory)?"Retrieve":"Entrust",type,i))continue;
                             if(plan.ExcludeProtected && s.IMProtectList.Contains(item->ItemId)) continue;
                             if(S.CabinetManager.ShouldExcludeItemFromProcessing(item->ItemId)) continue;
                             var itemCount = Utils.GetItemCount(allowedPlayerInventories, item->ItemId);
@@ -169,6 +181,7 @@ internal static unsafe class TaskEntrustDuplicates
                                         for(var q = 0; q < playerInv->Size; q++)
                                         {
                                             var playerItem = playerInv->GetInventorySlot(q);
+                                            if(!global::AutoRetainer.Modules.CompanionPolicy.AllowsSlot(playerType.EqualsAny(Utils.RetainerEntireInventory)?"Retrieve":"Entrust",playerType,q))continue;
                                             if(playerItem->ItemId == item->ItemId && playerItem->Flags.HasFlag(InventoryItem.ItemFlags.HighQuality) == item->Flags.HasFlag(InventoryItem.ItemFlags.HighQuality))
                                             {
                                                 var toEntrustFromStack = Math.Min(canFit, playerItem->Quantity);
@@ -202,6 +215,7 @@ internal static unsafe class TaskEntrustDuplicates
             {
                 if(IsAddonReady(numeric))
                 {
+                    if(!StorageConfirmationAllowed()){Callback.Fire(numeric,true,-1);return true;}
                     var maxAmount = numeric->AtkValues[3].UInt;
                     var result = Math.Clamp(RequestEntrustQuantity, 1, maxAmount);
                     if(EzThrottler.Throttle("EntrustItemInputNumeric", 200))
@@ -268,6 +282,7 @@ internal static unsafe class TaskEntrustDuplicates
                         var item = InventoryManager.Instance()->GetInventorySlot(type, i);
                         if(item->ItemId != 0 && item->Quantity > 0)
                         {
+                            if(!global::AutoRetainer.Modules.CompanionPolicy.AllowsSlot(type.EqualsAny(Utils.RetainerEntireInventory)?"Retrieve":"Entrust",type,i))continue;
                             if(plan.ExcludeProtected && s.IMProtectList.Contains(item->ItemId)) continue;
                             var itemCount = Utils.GetItemCount(allowedRetainerInventories, item->ItemId);
                             InternalLog.Debug($"[TED] Item count for {ExcelItemHelper.GetName(item->ItemId, true)} = {itemCount}");
@@ -317,6 +332,7 @@ internal static unsafe class TaskEntrustDuplicates
                                         for(var q = 0; q < playerInv->Size; q++)
                                         {
                                             var playerItem = playerInv->GetInventorySlot(q);
+                                            if(!global::AutoRetainer.Modules.CompanionPolicy.AllowsSlot(playerType.EqualsAny(Utils.RetainerEntireInventory)?"Retrieve":"Entrust",playerType,q))continue;
                                             if(playerItem->ItemId == item->ItemId && playerItem->Flags.HasFlag(InventoryItem.ItemFlags.HighQuality) == item->Flags.HasFlag(InventoryItem.ItemFlags.HighQuality))
                                             {
                                                 var toEntrustFromStack = Math.Min(canFit, playerItem->Quantity);
@@ -349,6 +365,8 @@ internal static unsafe class TaskEntrustDuplicates
     /// <param name="type"></param>
     private static void MoveSlotFromToRetainerInventoryUnsafe(InventoryItem* item, int toEntrustFromStack, int i, InventoryType type, InventoryType[] allowedSourceInventories)
     {
+        if(!global::AutoRetainer.Modules.CompanionPolicy.AllowsSlot(type.EqualsAny(Utils.RetainerEntireInventory)?"Retrieve":"Entrust",type,i))return;
+        pendingStorageType=type;pendingStorageSlot=i;pendingStorageItem=item->ItemId;pendingStorageQuantity=item->Quantity;
         RetainerItemCommand command;
         RetainerItemCommand quantityCommand;
         if(type.EqualsAny([..Utils.PlayerInvetoriesWithCrystals, .. Utils.PlayerArmory]))

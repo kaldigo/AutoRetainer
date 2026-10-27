@@ -136,3 +136,14 @@ Check(PolicyTransferAcknowledgement.Check(PolicyAck.Waiting,0,1,1)==PolicyAck.Wa
 Check(PolicyTransferAcknowledgement.Check(PolicyAck.Completed,0,2,1)==PolicyAck.Failed,"Unexpected destination gain holds for review");
 Check(PolicyTransferAcknowledgement.Check(PolicyAck.Completed,0,null,1)==PolicyAck.Failed,"Unavailable destination cannot release transaction");
 Console.WriteLine($"{total} checks passed including retainer destination acknowledgements.");
+
+foreach(var action in new[]{"Gc","Desynth","Vendor"})
+foreach(var gc in new[]{false,true})
+foreach(var desynth in new[]{false,true})
+{
+    Check(!PolicyDisposal.Allows(action,true,true,gc,desynth),"Demo mode blocks every disposal method");
+    Check(PolicyDisposal.Allows(action,false,true,gc,desynth)==(action==(gc?"Gc":desynth?"Desynth":"Vendor")),"GC-first method priority");
+    Check(PolicyDisposal.Allows(action,false,false,gc,desynth),"Opt-out preserves existing method behavior");
+}
+Check(PolicyDisposal.Allows("Store",true,true,true,true),"Disposal demo mode does not block collection/storage");
+Console.WriteLine($"{total} checks passed including disposal demo mode and priority.");

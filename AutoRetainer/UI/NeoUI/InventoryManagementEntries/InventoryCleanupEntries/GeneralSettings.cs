@@ -11,6 +11,18 @@ public class GeneralSettings : InventoryManagementBase
     {
         Builder = InventoryCleanupCommon.CreateCleanupHeaderBuilder()
             .Section(Name)
+            .Widget("Steward disposal priority", _ =>
+            {
+                if(!global::AutoRetainer.Modules.CompanionPolicy.IsManaged)return;
+                var cid=Svc.ClientState.LocalContentId;
+                var prefer=C.CompanionGcFirstCharacters.Contains(cid);
+                if(ImGui.Checkbox("Prefer GC, then desynthesis, then selling (this character)",ref prefer))
+                {
+                    if(prefer)C.CompanionGcFirstCharacters.Add(cid);else C.CompanionGcFirstCharacters.Remove(cid);
+                    ECommons.Configuration.EzConfig.Save();
+                }
+                ImGui.TextWrapped("Demo mode blocks all three disposal methods for Steward-managed characters. GC candidates remain held for GC delivery; they are not automatically downgraded to selling.");
+            })
             .Checkbox($"Auto-open venture coffers", () => ref InventoryCleanupCommon.SelectedPlan.IMEnableCofferAutoOpen, "Multi Mode only. Before logging out, all coffers will be opened unless your inventory space is too low.")
             .Indent()
             .InputInt(100f, "Maximum to open at once", () => ref InventoryCleanupCommon.SelectedPlan.MaxCoffersAtOnce)
@@ -40,7 +52,7 @@ public class GeneralSettings : InventoryManagementBase
             .Checkbox($"Allow selling/discarding items from Armory Chest", () => ref InventoryCleanupCommon.SelectedPlan.AllowSellFromArmory)
             .Checkbox("Deliver eligible items into Armoire when in Multi Mode", () => ref InventoryCleanupCommon.SelectedPlan.EnableCabinetAutoDelivery, "Items that are not in Armoire will be delivered there. Eligible items also will be excluded from being discarded, desynthesed, entrusted to retainers or delivered into grand company (only while you are running multi mode). This will trigger before Multi Mode Expert Delivery.")
             .Checkbox("Deliver eligible items into glamour dresser while in Multi Mode (requires Glamour log plugin)", () => ref InventoryCleanupCommon.SelectedPlan.EnableMirageAutoDelivery)
-            .Checkbox($"Demo mode", () => ref InventoryCleanupCommon.SelectedPlan.IMDry, "Do not sell/discard items, instead print in chat what would be sold")
+            .Checkbox($"Demo mode", () => ref InventoryCleanupCommon.SelectedPlan.IMDry, "Do not sell/discard items. For Steward-managed characters this also blocks Grand Company delivery and desynthesis. Turn off only after reviewing disposal proposals.")
             ;
     }
 }

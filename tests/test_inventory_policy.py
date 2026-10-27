@@ -13,7 +13,8 @@ class IntegrationContract(unittest.TestCase):
    with self.subTest(path=path):self.assertIn(guard,(ROOT/'AutoRetainer'/path).read_text())
  def test_opt_in_and_unavailable_provider_holds(self):
   text=(ROOT/'AutoRetainer/Modules/CompanionPolicy.cs').read_text()
-  self.assertIn('if(!ledger.Owners.TryGetValue(cid, out var owner)) return true;',text)
+  self.assertIn('if(!ledger.Owners.TryGetValue(cid, out var owner))',text)
+  self.assertIn('return action is not ("Gc" or "Desynth" or "Vendor")||!C.CompanionRequiredCleanupPlans.Contains(Data.GetIMSettings().GUID);',text)
   self.assertIn('return result == "Allow" && Connected(cid)',text)
   self.assertIn('Environment.TickCount64 - heartbeat > 5000',text)
   self.assertNotIn('WriteOfflineCharacterData',text)
@@ -139,7 +140,7 @@ class IntegrationContract(unittest.TestCase):
   self.assertLess(source.index('saved.Validate();'),source.index('Svc.Framework.Update+=Tick'))
  def test_ordinary_config_imports_cannot_erase_runtime_policy(self):
   source=(ROOT/'AutoRetainer/Modules/CompanionPolicy.cs').read_text()
-  allows=source.split('internal static bool Allows(')[1].split('internal static unsafe bool AllowsSlot')[0]
+  allows=source.split('internal static unsafe bool Allows(')[1].split('internal static unsafe bool AllowsSlot')[0]
   self.assertIn('ledger.Owners.TryGetValue',allows)
   self.assertNotIn('C.CompanionPolicy',allows)
   self.assertIn('internal static bool StartupBlocked=>!ready;',source)

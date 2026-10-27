@@ -407,6 +407,7 @@ internal static unsafe class GCContinuation
                 if(!data.Value.ItemUICategory.RowId.EqualsAny([.. Utils.ArmorsUICategories, .. Utils.WeaponsUICategories])) continue;
                 if(!data.Value.GetRarity().EqualsAny(ItemRarity.Green, ItemRarity.Pink, ItemRarity.Blue)) continue;
                 if(data.Value.Desynth == 0) continue;
+                if(!CompanionPolicy.AllowsSlot("Gc",x,i))continue;
                 return true;
             }
         }
