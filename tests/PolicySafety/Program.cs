@@ -3,6 +3,39 @@ using AutoRetainer.Modules;
 var pending=new PolicyConfirmation(12,42,"Inventory1/0/42/1/None",1000);
 var total=0;
 void Check(bool result,string name){total++;if(!result)throw new Exception(name);}
+{
+    void ToReview(PolicyCleanupCycle c,uint withdrawn,uint disposed)
+    {
+        if(c.Phase==CleanupPhase.Bell)c.Advance();
+        c.Visited=2;c.ConfirmWithdrawal(withdrawn);c.Advance();
+        c.ConfirmDisposal(disposed);c.Advance();c.Advance();c.Advance();c.Advance();
+        Check(c.Phase==CleanupPhase.Review,"Cleanup uses withdrawal, GC, desynthesis, return and vendor stages");
+    }
+    var cycle=new PolicyCleanupCycle();
+    Check(!cycle.Active,"Cleanup does not start on load");
+    cycle.ConfirmDisposal(3);Check(cycle.Disposed==0,"Unrelated disposal while idle is not batch progress");
+    cycle.Start(12);ToReview(cycle,5,5);cycle.Review(true,false);
+    Check(cycle.Active&&cycle.Phase==CleanupPhase.Withdraw&&cycle.Pass==2,"Confirmed batch returns for another retainer pass");
+    Check(cycle.Withdrawn==0&&cycle.Disposed==0,"Each batch requires new confirmed progress");
+    ToReview(cycle,0,0);cycle.Review(true,false);
+    Check(!cycle.Active&&cycle.Phase==CleanupPhase.Complete,"An empty completed sweep ends the cycle");
+    Check(cycle.TotalDisposed==5&&cycle.TotalWithdrawn==5,"The final empty sweep preserves actual run totals");
+    cycle.Start(12);ToReview(cycle,4,0);cycle.Review(true,false);
+    Check(cycle.Phase==CleanupPhase.Stopped,"Withdrawals without confirmed disposal cannot loop");
+    cycle.Start(12);ToReview(cycle,0,0);cycle.Review(false,false);
+    Check(cycle.Phase==CleanupPhase.Stopped,"Full bags are a blocked batch, not successful completion");
+    cycle.Start(12);ToReview(cycle,4,2);cycle.Review(true,true);
+    Check(cycle.Phase==CleanupPhase.Stopped,"Remaining GC candidates stop further withdrawals");
+    cycle.Start(12);ToReview(cycle,0,3);cycle.Review(true,false);
+    Check(cycle.Active&&cycle.Pass==2,"Disposing carried items can free room for the first withdrawal batch");
+    cycle.Stop("cancelled");Check(!cycle.Active,"Cancellation stops future batch phases");
+    cycle.Start(12);ToReview(cycle,0,0);cycle.Visited=0;cycle.Review(true,false);
+    Check(cycle.Phase==CleanupPhase.Stopped,"No included retainers cannot masquerade as a completed sweep");
+    cycle.Start(12);
+    for(var pass=0;pass<100;pass++){ToReview(cycle,1,1);cycle.Review(true,false);}
+    Check(cycle.Phase==CleanupPhase.Stopped,"Bounded batch count prevents an endless changing inventory loop");
+    Check(!new PolicyCleanupCycle().Active,"Plugin restart never resumes batch automation implicitly");
+}
 Check(pending.StillValid(12,42,pending.Fingerprint,1001,true),"Unchanged permitted confirmation");
 Check(!pending.StillValid(12,42,pending.Fingerprint,1001,false),"Revoked protection or unavailable policy blocks final confirmation");
 Check(!pending.StillValid(13,42,pending.Fingerprint,1001,true),"Character changed");

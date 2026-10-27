@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><AllowUnsafeBlocks>true</AllowUnsafeBlocks></PropertyGroup>
   <ItemGroup>
+    <Compile Include="../../AutoRetainer/Modules/PolicyCleanupCycle.cs" Link="PolicyCleanupCycle.cs" />
     <Compile Include="../../AutoRetainer/Modules/CompanionSettings.cs" Link="CompanionSettings.cs" />
     <Compile Include="../../AutoRetainerAPI/AutoRetainerAPI/Configuration/InventoryManagementSettings.cs" Link="InventoryManagementSettings.cs" />
     <Compile Include="../../AutoRetainer/Modules/PolicyDisposal.cs" Link="PolicyDisposal.cs" />

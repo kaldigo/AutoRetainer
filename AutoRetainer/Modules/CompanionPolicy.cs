@@ -32,6 +32,12 @@ internal static partial class CompanionPolicy
         ledger.Faults.UnionWith(ledger.Pending);
         if(!migrated || ledger.Owners.Count!=0 || ledger.Faults.Count!=0 || ledger.Pending.Count!=0)SavePolicy();
         ready=true;
+        Svc.PluginInterface.GetIpcProvider<int>("AutoRetainer.InventoryPolicy.CleanupVersion").RegisterFunc(()=>1);
+        Svc.PluginInterface.GetIpcProvider<ulong,bool>("AutoRetainer.InventoryPolicy.StartCleanup").RegisterFunc(StartCleanup);
+        Svc.PluginInterface.GetIpcProvider<ulong,bool>("AutoRetainer.InventoryPolicy.StopCleanup").RegisterFunc(StopCleanup);
+        Svc.PluginInterface.GetIpcProvider<ulong,bool>("AutoRetainer.InventoryPolicy.CleanupActive").RegisterFunc(cid=>cleanup.Active&&cleanup.Character==cid);
+        Svc.PluginInterface.GetIpcProvider<string>("AutoRetainer.InventoryPolicy.CleanupStatus").RegisterFunc(()=>CleanupStatus);
+        Svc.PluginInterface.GetIpcProvider<ulong,ulong,uint,bool>("AutoRetainer.InventoryPolicy.CleanupWithdrawalConfirmed").RegisterFunc(CleanupWithdrawalConfirmed);
         Svc.PluginInterface.GetIpcProvider<uint,uint,bool>("AutoRetainer.InventoryPolicy.DisposalSelected").RegisterFunc((id,quantity)=>
             !Data.GetIMSettings().IMDry&&Utils.IsItemSelectedByHardList(id,quantity)&&
             (GcDisposalCandidate(id)||Data.GetIMSettings().IMEnableAutoVendor||Data.GetIMSettings().IMEnableNpcSell||DesynthDisposalEligible(id)));
@@ -76,7 +82,7 @@ internal static partial class CompanionPolicy
             item.Value.GetRarity().EqualsAny(ItemRarity.Green,ItemRarity.Pink,ItemRarity.Blue)&&item.Value.Desynth>0;
     }
     private static bool DisposalMethodAllows(string action,uint id)=>action is not ("Gc" or "Desynth" or "Vendor")||PolicyDisposal.Allows(action,Data.GetIMSettings().IMDry,
-        C.CompanionGcFirstCharacters.Contains(Svc.ClientState.LocalContentId),GcDisposalCandidate(id),
+        C.CompanionGcFirstCharacters.Contains(Svc.ClientState.LocalContentId)||cleanup.Active,GcDisposalCandidate(id),
         DesynthDisposalEligible(id));
     private static readonly Dictionary<ulong,long> strategyVisits=[];
     internal static bool StrategyDue(ulong retainer)
@@ -98,6 +104,7 @@ internal static partial class CompanionPolicy
         if(ledger.Faults.Add(cid))
             try{SavePolicy();}catch(Exception ex){Svc.Log.Error(ex,"Could not persist companion review hold");}
         Status="Managed item actions held for review: "+reason;
+        if(cleanup.Active)EndCleanup(reason,false);
         try{MaintainPauses();}catch(Exception ex){Svc.Log.Error(ex,"Could not maintain dialog pauses; item actions remain held");}
         if(!notify)return;
         try{Svc.PluginInterface.GetIpcSubscriber<ulong,string,object>("Steward.InventoryPolicy.Fault").InvokeAction(cid,reason);}
@@ -146,6 +153,7 @@ internal static partial class CompanionPolicy
     private static void Tick(Dalamud.Plugin.Services.IFramework _)
     {
         CheckSubmission();
+        try{TickCleanup();}catch(Exception ex){EndCleanup("Coordinator failed: "+ex.Message,true);}
         foreach(var cid in ledger.Pending.Where(id=>id!=Svc.ClientState.LocalContentId).ToArray())
             if(ledger.Faults.Add(cid))try{SavePolicy();}catch(Exception ex){Svc.Log.Error(ex,"Could not persist interrupted transaction hold");}
         if(submission!=null && submission.Character!=Svc.ClientState.LocalContentId)submission=null;
@@ -321,6 +329,13 @@ internal static partial class CompanionPolicy
 
     internal static void Shutdown()
     {
+        if(cleanup.Active)EndCleanup("AutoRetainer unloaded",false);
+        Svc.PluginInterface.GetIpcProvider<int>("AutoRetainer.InventoryPolicy.CleanupVersion").UnregisterFunc();
+        Svc.PluginInterface.GetIpcProvider<ulong,bool>("AutoRetainer.InventoryPolicy.StartCleanup").UnregisterFunc();
+        Svc.PluginInterface.GetIpcProvider<ulong,bool>("AutoRetainer.InventoryPolicy.StopCleanup").UnregisterFunc();
+        Svc.PluginInterface.GetIpcProvider<ulong,bool>("AutoRetainer.InventoryPolicy.CleanupActive").UnregisterFunc();
+        Svc.PluginInterface.GetIpcProvider<string>("AutoRetainer.InventoryPolicy.CleanupStatus").UnregisterFunc();
+        Svc.PluginInterface.GetIpcProvider<ulong,ulong,uint,bool>("AutoRetainer.InventoryPolicy.CleanupWithdrawalConfirmed").UnregisterFunc();
         if(control.Active)control.Release(control.Owner);
         Svc.PluginInterface.GetIpcProvider<uint,uint,bool>("AutoRetainer.InventoryPolicy.DisposalSelected").UnregisterFunc();
         Svc.PluginInterface.GetIpcProvider<uint,uint,string>("AutoRetainer.InventoryPolicy.DisposalPreview").UnregisterFunc();

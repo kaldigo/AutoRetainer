@@ -1028,7 +1028,8 @@ public static unsafe class Utils
         for(var i = 0; i < GameRetainerManager.Count; i++)
         {
             var ret = GameRetainerManager.Retainers[i];
-            if(ret.Available)
+            if(ret.Available && (!CompanionPolicy.IsManaged||!C.CompanionGilOnlyRetainers.Contains(ret.RetainerID)) &&
+                (!CompanionPolicy.CleanupActive||CompanionPolicy.CleanupRetainerAllowed(Svc.ClientState.LocalContentId,ret.RetainerID)))
             {
                 P.TaskManager.Enqueue(() => RetainerListHandlers.SelectRetainerByName(ret.Name.ToString()));
                 TaskVendorItems.Enqueue();

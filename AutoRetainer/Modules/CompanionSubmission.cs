@@ -90,7 +90,11 @@ internal static partial class CompanionPolicy
                 result=PolicyTransferAcknowledgement.Check(result,pending.DestinationBefore,stored,pending.Removed);
                 if(result==PolicyAck.Failed)throw new InvalidOperationException("Retainer destination acknowledgement is missing or unexpected");
             }
-            if(result==PolicyAck.Completed){CompleteTransaction();submission=null;}
+            if(result==PolicyAck.Completed)
+            {
+                CompleteTransaction();submission=null;
+                if(pending.Action is "Vendor" or "Desynth")cleanup.ConfirmDisposal(pending.Removed);
+            }
         }
         catch(Exception ex){ReportFault(pending.Action+" requires inventory review: "+ex.Message);}
     }

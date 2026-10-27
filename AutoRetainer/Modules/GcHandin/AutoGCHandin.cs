@@ -150,6 +150,7 @@ internal static unsafe class AutoGCHandin
             try{CompanionPolicy.CompleteTransaction();}
             catch(Exception ex){HoldPending("GC acknowledgement journal could not be cleared: "+ex.Message);return;}
             Svc.Log.Information($"[Steward GC] Delivery acknowledged: item={pendingConfirmation.ItemId}, before={pendingQuantity}, after={quantity}; confirmation closed and inventory decrease observed");
+            CompanionPolicy.CleanupDisposalConfirmed();
             pendingConfirmation=null;pendingDelivered=false;
         }
         if(Svc.Condition[ConditionFlag.OccupiedInQuestEvent] && TryGetAddonByName<AtkUnitBase>("GrandCompanySupplyList", out var addon))
@@ -262,6 +263,7 @@ internal static unsafe class AutoGCHandin
                 if(IsDone(addon))
                 {
                     var s = $"Automatic handin has been completed";
+                    CompanionPolicy.CleanupGcCompleted();
                     DuoLog.Information(s);
                     if(C.GCHandinNotify)
                     {
@@ -310,12 +312,14 @@ internal static unsafe class AutoGCHandin
                                 {
                                     if(FindNextHandinItem(false) == null)
                                     {
+                                        CompanionPolicy.CleanupGcCompleted();
                                         GCContinuation.EnqueueDeliveryClose();
                                         EzThrottler.Reset($"GcBusy");
                                         throw new GCHandinInterruptedException("Auto GC handin completed");
                                     }
                                     else
                                     {
+                                        if(!C.AutoGCContinuation)CompanionPolicy.CleanupGcCompleted(true);
                                         GCContinuation.EnqueueDeliveryClose();
                                         if(C.AutoGCContinuation)
                                         {

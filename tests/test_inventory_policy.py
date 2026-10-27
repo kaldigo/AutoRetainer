@@ -122,7 +122,8 @@ class IntegrationContract(unittest.TestCase):
   self.assertIn('PolicyPersistence.Submit(()=>{MaintainPauses();BeginTransaction();}',source)
   self.assertIn('AllowsSlot(action,type,slot,true)',source)
   self.assertIn('PolicySlotAcknowledgement.Check(',source)
-  self.assertIn('if(result==PolicyAck.Completed){CompleteTransaction();submission=null;}',source)
+  ack=source.split('if(result==PolicyAck.Completed)')[1]
+  self.assertIn('CompleteTransaction();submission=null;',ack)
   memory=(ROOT/'AutoRetainer/Internal/Memory.cs').read_text()
   self.assertEqual(memory.count('CompanionPolicy.SubmitSlot("Vendor"'),2)
   self.assertIn('CompanionPolicy.SubmitSlot("Desynth"',(ROOT/'AutoRetainer/Scheduler/Tasks/TaskDesynthItems.cs').read_text())
