@@ -249,8 +249,8 @@ internal static partial class CompanionPolicy
         {
             case "Overflow": return EnqueueOverflow(cid);
             case "Collect": return EnqueueOverflow(cid,true);
-            case "Armoire": S.CabinetManager.EnqueueGoToInnAndDeliverEverything(); return true;
-            case "Dresser": S.MirageManager.EnqueueGoToInnAndDeliverEverything(true); return true;
+            case "Armoire": return EnqueueCollectionVisit(cid,true);
+            case "Dresser": return EnqueueCollectionVisit(cid,false);
             case "Vendor": Scheduler.Tasks.TaskVendorItems.EnqueueFromCommand(); return true;
             case "Desynth": if(!Data.GetIMSettings().IMEnableItemDesynthesis) return false; Scheduler.Tasks.TaskDesynthItems.Enqueue(); return true;
             case "Gc": return Scheduler.Tasks.TaskDeliverItems.Enqueue();

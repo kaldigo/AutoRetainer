@@ -8,6 +8,26 @@ namespace AutoRetainer.Modules;
 
 internal static partial class CompanionPolicy
 {
+    private static unsafe bool? CloseBellForCollection(ulong cid)
+    {
+        if(!Connected(cid)||HasFault)return null;
+        if(TryGetAddonByName<FFXIVClientStructs.FFXIV.Component.GUI.AtkUnitBase>("RetainerList",out var list)&&list->IsVisible)
+        {
+            RetainerListHandlers.CloseRetainerList();
+            return false; // Wait for the actual close before AutoRetainer approaches storage.
+        }
+        return !Svc.Condition[Dalamud.Game.ClientState.Conditions.ConditionFlag.OccupiedSummoningBell];
+    }
+
+    private static bool EnqueueCollectionVisit(ulong cid,bool armoire)
+    {
+        P.TaskManager.Enqueue(()=>CloseBellForCollection(cid),"Close bell before collection storage");
+        Svc.Log.Information("Steward collection route: opening {Storage}",armoire?"armoire":"glamour dresser");
+        if(armoire)S.CabinetManager.EnqueueGoToInnAndDeliverEverything();
+        else S.MirageManager.EnqueueGoToInnAndDeliverEverything(true);
+        return true;
+    }
+
     private static unsafe long? CountStored(uint id,bool hq)
     {
         var manager=InventoryManager.Instance();if(manager==null)return null;
