@@ -62,7 +62,7 @@ internal static partial class CompanionPolicy
         Svc.PluginInterface.GetIpcProvider<ulong, bool>("AutoRetainer.InventoryPolicy.ClearFault").RegisterFunc(ClearFault);
         Svc.PluginInterface.GetIpcProvider<ulong,string,object>("AutoRetainer.InventoryPolicy.Hold").RegisterAction((cid,reason)=>{if(Connected(cid))ReportFault(reason,false);});
     }
-    private static bool DesynthDisposalEligible(uint id)=>QuestManager.IsQuestComplete(65688)&&Scheduler.Tasks.TaskDesynthItems.DesynthEligible(id);
+    private static bool DesynthDisposalEligible(uint id)=>Scheduler.Tasks.TaskDesynthItems.DesynthEligible(id);
     private static string DisposalPreview(uint id,uint quantity)
     {
         if(!IsManaged||!Connected(Svc.ClientState.LocalContentId))return "AutoRetainer companion unavailable; held";

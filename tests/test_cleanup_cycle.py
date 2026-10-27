@@ -3,6 +3,14 @@ from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]/'AutoRetainer'
 class CleanupCycleWiring(unittest.TestCase):
+ def test_vendor_and_companion_share_quest_aware_desynth_eligibility(self):
+  task=(ROOT/'Scheduler/Tasks/TaskDesynthItems.cs').read_text().split('public static bool DesynthEligible')[1].split('private static bool IsOnIMList')[0]
+  self.assertIn('PolicyDisposal.CanDesynth(QuestManager.IsQuestComplete(65688)',task)
+  self.assertLess(task.index('item.Value.Desynth<=0'),task.index('PlayerState.Instance()'))
+  policy=(ROOT/'Modules/CompanionPolicy.cs').read_text()
+  self.assertIn('DesynthDisposalEligible(uint id)=>Scheduler.Tasks.TaskDesynthItems.DesynthEligible(id)',policy)
+  inventory=(ROOT/'Internal/InventoryManagement/InventorySpaceManager.cs').read_text()
+  self.assertIn('!TaskDesynthItems.DesynthEligible(item.ItemId)',inventory)
  def test_reuses_upstream_actions_and_has_no_native_callbacks(self):
   text=(ROOT/'Modules/CompanionCleanup.cs').read_text()
   for action in ['TaskDeliverItems.Enqueue()','TaskDesynthItems.Enqueue()','TaskVendorItems.EnqueueFromCommand()','TaskTeleportToProperty.EnqueueIfNeededAndPossible(false)','EnqueueOverflow(cleanup.Character,disposalOnly:true)']:

@@ -201,5 +201,14 @@ foreach(var desynth in new[]{false,true})
 }
 Check(PolicyDisposal.Allows("Store",true,true,true,true),"Disposal demo mode does not block collection/storage");
 Console.WriteLine($"{total} checks passed including disposal demo mode and priority.");
+foreach(var unlocked in new[]{false,true})
+foreach(var enabled in new[]{false,true})
+foreach(var supported in new[]{false,true})
+foreach(var level in new[]{0,29,30,100})
+{
+    var eligible=PolicyDisposal.CanDesynth(unlocked,enabled,supported,level);
+    Check(eligible==(unlocked&&enabled&&supported&&level>=30),"Desynthesis requires unlock, enabled method, supported item and crafting level");
+    Check(PolicyDisposal.Allows("Vendor",false,true,false,eligible)==!eligible,"Vendor route and desynthesis reservation agree, including locked quest");
+}
 SettingsChecks.Run(Check);
 Console.WriteLine($"{total} checks passed including live inherited protection without candidate-list cloning.");

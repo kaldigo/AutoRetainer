@@ -62,9 +62,11 @@ public static unsafe class TaskDesynthItems
 
     public static bool DesynthEligible(uint itemID)
     {
-        return Data.GetIMSettings().IMEnableItemDesynthesis
-            && ExcelItemHelper.Get(itemID).Value.Desynth > 0
-            && PlayerState.Instance()->ClassJobLevels[ExcelItemHelper.Get(itemID).Value.ClassJobRepair.Value.ExpArrayIndex] >= 30;
+        var item=ExcelItemHelper.Get(itemID);
+        if(!item.HasValue||item.Value.Desynth<=0)return false;
+        return PolicyDisposal.CanDesynth(QuestManager.IsQuestComplete(65688),
+            Data.GetIMSettings().IMEnableItemDesynthesis,item.Value.Desynth>0,
+            PlayerState.Instance()->ClassJobLevels[item.Value.ClassJobRepair.Value.ExpArrayIndex]);
     }
 
     private static bool IsOnIMList(uint itemID)
