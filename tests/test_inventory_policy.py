@@ -11,10 +11,10 @@ class IntegrationContract(unittest.TestCase):
   paths={'Internal/InventoryManagement/InventorySpaceManager.cs':'AllowsSlot("Vendor"','Internal/InventoryManagement/NpcSaleManager.cs':'AllowsSlot("Vendor"','Scheduler/Tasks/TaskDesynthItems.cs':'AllowsSlot("Desynth"','Modules/GcHandin/AutoGCHandin.cs':'Allows("Gc"','Helpers/Utils.cs':'AllowsSlot("Discard"'}
   for path,guard in paths.items():
    with self.subTest(path=path):self.assertIn(guard,(ROOT/'AutoRetainer'/path).read_text())
- def test_opt_in_and_unavailable_provider_holds(self):
+ def test_absent_provider_allows_only_safe_standalone_operations(self):
   text=(ROOT/'AutoRetainer/Modules/CompanionPolicy.cs').read_text()
   self.assertIn('if(!ledger.Owners.TryGetValue(cid, out var owner))',text)
-  self.assertIn('return action is not ("Gc" or "Desynth" or "Vendor")||!C.CompanionRequiredCleanupPlans.Contains(Data.GetIMSettings().GUID);',text)
+  self.assertIn('return StandaloneAllows(action,container);',text)
   self.assertIn('return result == "Allow" && Connected(cid)',text)
   self.assertIn('Environment.TickCount64 - heartbeat > 5000',text)
   self.assertNotIn('WriteOfflineCharacterData',text)
@@ -61,7 +61,7 @@ class IntegrationContract(unittest.TestCase):
  def test_managed_bulk_cannot_outlive_per_item_policy(self):
   text=(ROOT/'AutoRetainer/Modules/CompanionPolicy.cs').read_text()
   body=text.split('internal static unsafe bool AllowsDresserBatch()')[1].split('internal static void Shutdown()')[0]
-  self.assertIn('if(!ledger.Owners.ContainsKey(Svc.ClientState.LocalContentId)) return true;',body)
+  self.assertNotIn('return true;',body)
   self.assertIn('return false;',body)
   self.assertNotIn('AllowsSlot("Dresser"',body)
  def test_lease_watchdog_only_releases_its_recorded_handoff(self):

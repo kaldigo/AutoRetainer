@@ -64,7 +64,7 @@ internal static unsafe class AutoGCHandin
 
     private static bool PendingAllowed(bool matchesDialog)
     {
-        if(!CompanionPolicy.IsManaged)return true;
+        if(!CompanionPolicy.CompanionAvailable)return false;
         var pending=pendingConfirmation;
         string fingerprint=null;
         bool? permitted=null;
@@ -85,7 +85,7 @@ internal static unsafe class AutoGCHandin
 
     private static bool MatchesPendingReward(AtkUnitBase* addon)
     {
-        if(!CompanionPolicy.IsManaged)return true;
+        if(!CompanionPolicy.CompanionAvailable)return false;
         if(pendingConfirmation==null)return false;
         var expected=ExcelItemHelper.GetName(pendingConfirmation.ItemId);
         var observed=new List<string>();

@@ -78,7 +78,8 @@ internal static unsafe class SchedulerMain
                                     P.TaskManager.Enqueue(() => RetainerListHandlers.SelectRetainerByName(retainer));
 
                                     var adata = Utils.GetAdditionalData(Svc.ClientState.LocalContentId, ret.Name.ToString());
-                                    if(C.CompanionGilOnlyRetainers.Contains(ret.RetainerID))
+                                    var manualItems=C.CompanionGilOnlyRetainers.Contains(ret.RetainerID);
+                                    if(manualItems&&!VentureDue(ret,adata))
                                     {
                                         if(Modules.CompanionPolicy.Allows("Gil",0))TaskWithdrawGil.Enqueue(100);
                                         if(Modules.CompanionPolicy.StrategyDue(ret.RetainerID))
@@ -92,7 +93,7 @@ internal static unsafe class SchedulerMain
                                     }
 
 
-                                    if(Data.GetIMSettings().IMEnableAutoVendor)
+                                    if(!manualItems&&Data.GetIMSettings().IMEnableAutoVendor)
                                     {
                                         TaskVendorItems.Enqueue();
                                     }
@@ -179,13 +180,15 @@ internal static unsafe class SchedulerMain
                                     }
 
                                     var selectedPlan = C.EntrustPlans.FirstOrDefault(x => x.Guid == adata.EntrustPlan && !x.ManualPlan);
-                                    if(C.EnableEntrustManager && selectedPlan != null)
+                                    if(!manualItems&&C.EnableEntrustManager && selectedPlan != null)
                                     {
                                         TaskEntrustDuplicates.EnqueueNew(selectedPlan);
                                     }
 
                                     //withdraw gil
-                                    if(adata.WithdrawGil && Modules.CompanionPolicy.Allows("Gil",0))
+                                    if(manualItems&&Modules.CompanionPolicy.Allows("Gil",0))
+                                        TaskWithdrawGil.Enqueue(100);
+                                    else if(adata.WithdrawGil && Modules.CompanionPolicy.Allows("Gil",0))
                                     {
                                         if(adata.Deposit)
                                         {
@@ -197,13 +200,18 @@ internal static unsafe class SchedulerMain
                                         }
                                     }
 
-                                    if(Data.GetIMSettings().IMEnableAutoVendor)
+                                    if(!manualItems&&Data.GetIMSettings().IMEnableAutoVendor)
                                     {
                                         TaskVendorItems.Enqueue();
                                     }
 
                                     //fire event, let other plugins deal with retainer
-                                    TaskPostprocessRetainerIPC.Enqueue(retainer);
+                                    if(!manualItems)TaskPostprocessRetainerIPC.Enqueue(retainer);
+                                    else if(Modules.CompanionPolicy.StrategyDue(ret.RetainerID))
+                                    {
+                                        Modules.CompanionPolicy.MarkStrategyVisit(ret.RetainerID);
+                                        TaskPostprocessRetainerIPC.Enqueue(retainer,"Steward");
+                                    }
 
                                     if(C.RetainerMenuDelay > 0)
                                     {
@@ -333,6 +341,11 @@ internal static unsafe class SchedulerMain
         }
     }
 
+    private static bool VentureDue(OfflineRetainerData ret,AdditionalRetainerData data)
+        =>Modules.PolicyStandalone.VentureDue(ret.GetVentureSecondsRemaining(),C.UnsyncCompensation,ret.VentureID,CanAssignQuickExploration,data.EnablePlanner&&data.VenturePlan.ListUnwrapped.Count>0);
+    private static bool VentureDue(GameRetainerManager.Retainer ret,AdditionalRetainerData data)
+        =>Modules.PolicyStandalone.VentureDue(ret.GetVentureSecondsRemaining(),C.UnsyncCompensation,ret.VentureID,CanAssignQuickExploration,data.EnablePlanner&&data.VenturePlan.ListUnwrapped.Count>0);
+
     internal static string GetNextRetainerName()
     {
         if(GameRetainerManager.Ready)
@@ -352,11 +365,11 @@ internal static unsafe class SchedulerMain
                     var adata = Utils.GetAdditionalData(Svc.ClientState.LocalContentId, rname);
                     if(C.CompanionGilOnlyRetainers.Contains(r.RetainerID))
                     {
-                        if(P.GetSelectedRetainers(Svc.ClientState.LocalContentId).Contains(rname)&&(r.Gil>0&&Modules.CompanionPolicy.Allows("Gil",0)||Modules.CompanionPolicy.StrategyDue(r.RetainerID)))return rname;
+                        if(Modules.PolicyStandalone.VisitManualRetainer(P.GetSelectedRetainers(Svc.ClientState.LocalContentId).Contains(rname),VentureDue(r,adata),r.Gil>0&&Modules.CompanionPolicy.Allows("Gil",0),Modules.CompanionPolicy.StrategyDue(r.RetainerID)))return rname;
                         continue;
                     }
                     if(P.GetSelectedRetainers(Svc.ClientState.LocalContentId).Contains(rname)
-                        && r.GetVentureSecondsRemaining() <= C.UnsyncCompensation && (r.VentureID != 0 || CanAssignQuickExploration || (adata.EnablePlanner && adata.VenturePlan.ListUnwrapped.Count > 0)))
+                        && VentureDue(r,adata))
                     {
                         return rname;
                     }

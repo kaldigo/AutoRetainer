@@ -4,13 +4,16 @@ public class TaskPostprocessCharacterIPC
 {
     internal static void Enqueue(string pluginToProcess = null)
     {
+        if(!Modules.CompanionPolicy.CompanionAvailable)return;
         P.TaskManager.Enqueue(() =>
         {
+            if(!Modules.CompanionPolicy.CompanionAvailable)return;
             SchedulerMain.CharacterPostprocess = SchedulerMain.CharacterPostprocess.Clear();
             IPC.FireCharacterPostprocessTaskRequestEvent();
         }, "TaskCharacterPostprocessIPCEnqueue");
         P.TaskManager.Enqueue(() =>
         {
+            if(!Modules.CompanionPolicy.CompanionAvailable)return;
             P.TaskManager.BeginStack();
             try
             {
@@ -19,6 +22,7 @@ public class TaskPostprocessCharacterIPC
                 {
                     P.TaskManager.Enqueue(() =>
                         {
+                            if(!Modules.CompanionPolicy.CompanionAvailable)return;
                             SchedulerMain.CharacterPostprocess = SchedulerMain.CharacterPostprocess.Remove(x);
                             SchedulerMain.CharacterPostProcessLocked = true;
                             IPC.FireCharacterPostprocessEvent(x);

@@ -8,8 +8,8 @@ class DisposalBoundary(unittest.TestCase):
   self.assertIn('PolicyDisposal.Allows(action,Data.GetIMSettings().IMDry',source)
  def test_prepared_plans_cannot_escape_to_unmanaged_disposal(self):
   source=(ROOT/'Modules/CompanionPolicy.cs').read_text()
-  branch=source.split('if(!ledger.Owners.TryGetValue(cid, out var owner))')[1].split('if(ledger.Pending.Contains')[0]
-  self.assertIn('CompanionRequiredCleanupPlans.Contains(Data.GetIMSettings().GUID)',branch)
+  branch=source.split('if(!ledger.Owners.TryGetValue(cid, out var owner))')[1].split('if(character != cid')[0]
+  self.assertIn('StandaloneAllows(action,container)',branch)
  def test_demo_blocks_disposal_routes_and_withdrawals(self):
   source=(ROOT/'Modules/CompanionPolicy.cs').read_text()
   self.assertIn('!Data.GetIMSettings().IMDry&&Utils.IsItemSelectedByHardList',source)

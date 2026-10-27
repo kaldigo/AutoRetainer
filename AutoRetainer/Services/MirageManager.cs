@@ -23,6 +23,7 @@ public unsafe class MirageManager
 
     public bool HasEligibleItems()
     {
+        if(!CompanionPolicy.CompanionAvailable)return false;
         foreach(var inv in Utils.PlayerEntireInventory)
         {
             var invCont = InventoryManager.Instance()->GetInventoryContainer(inv);
@@ -45,6 +46,7 @@ public unsafe class MirageManager
 
     public void EnqueueGoToInnAndDeliverEverything(bool leaveOpen)
     {
+        if(!CompanionPolicy.CompanionAvailable)return;
         P.TaskManager.EnqueueTask(NeoTasks.ApproachObjectViaAutomove(GetDresser, 4.4f));
         P.TaskManager.EnqueueTask(NeoTasks.InteractWithObject(GetDresser));
         P.TaskManager.Enqueue(() =>

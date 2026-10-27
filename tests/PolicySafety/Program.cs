@@ -240,5 +240,17 @@ Check(!PolicyStorageRouting.UniqueFits(true,1),"Already stored unique item is sk
 Check(!PolicyStorageRouting.UniqueFits(true,null),"Unknown destination contents cannot approve a unique deposit");
 Check(PolicyStorageRouting.UniqueFits(true,0),"Missing unique item can be entrusted");
 Check(PolicyStorageRouting.UniqueFits(false,1),"Ordinary duplicates retain native stacking behavior");
+foreach(var action in new[]{"Entrust","Retrieve","Gil"})
+    Check(PolicyStandalone.Allows(action),"Standalone keeps native inventory transfer and gil handling: "+action);
+foreach(var action in new[]{"Gc","Desynth","Vendor","Discard","Market","Reprice","MarketReturn","Dresser","Armoire","Store","Unknown",""})
+    Check(!PolicyStandalone.Allows(action),"Standalone cannot consume, sell or alter collection items: "+action);
+foreach(var selected in new[]{false,true})foreach(var due in new[]{false,true})foreach(var gil in new[]{false,true})foreach(var strategy in new[]{false,true})
+    Check(PolicyStandalone.VisitManualRetainer(selected,due,gil,strategy)==(selected&&(due||gil||strategy)),"Manual item retainer still visits for due ventures, gil or explicit strategy");
+Check(PolicyStandalone.FinishesSoon(240)&&!PolicyStandalone.VentureDue(240,-5,1,false,false),"Five-minute wait includes Skaenwyda without prematurely collecting her venture");
+Check(PolicyStandalone.FinishesSoon(-6)&&PolicyStandalone.VentureDue(-6,-5,1,false,false),"Completed Skaenwyda venture is processed instead of waiting forever");
+Check(!PolicyStandalone.FinishesSoon(3600)&&!PolicyStandalone.VentureDue(3600,-5,1,false,false),"Reassigned venture no longer keeps the five-minute wait active");
+Check(PolicyStandalone.VisitManualRetainer(true,false,true,false),"Gil-only visit does not require an early venture reassignment");
+Check(!PolicyStandalone.VentureDue(-10,-5,0,false,false),"Unassigned retainer cannot loop without an assignable venture");
+Check(!PolicyStandalone.Allows("Retrieve",false),"Standalone cannot misclassify market listing withdrawal as ordinary retrieval");
 SettingsChecks.Run(Check);
 Console.WriteLine($"{total} checks passed including live inherited protection without candidate-list cloning.");

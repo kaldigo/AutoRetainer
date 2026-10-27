@@ -4,13 +4,16 @@ internal static class TaskPostprocessRetainerIPC
 {
     internal static void Enqueue(string retainer, string pluginToProcess = null)
     {
+        if(!Modules.CompanionPolicy.CompanionAvailable)return; // Standalone visits run native ventures/entrust only.
         P.TaskManager.Enqueue(() =>
         {
+            if(!Modules.CompanionPolicy.CompanionAvailable)return;
             SchedulerMain.RetainerPostprocess = SchedulerMain.RetainerPostprocess.Clear();
             IPC.FireRetainerPostprocessTaskRequestEvent(retainer);
         }, "TaskRetainerPostprocessIPCEnqueue");
         P.TaskManager.Enqueue(() =>
         {
+            if(!Modules.CompanionPolicy.CompanionAvailable)return;
             P.TaskManager.BeginStack();
             try
             {
@@ -19,6 +22,7 @@ internal static class TaskPostprocessRetainerIPC
                 {
                     P.TaskManager.Enqueue(() =>
                     {
+                        if(!Modules.CompanionPolicy.CompanionAvailable)return;
                         SchedulerMain.RetainerPostprocess = SchedulerMain.RetainerPostprocess.Remove(x);
                         SchedulerMain.RetainerPostProcessLocked = true;
                         IPC.FireRetainerPostprocessEvent(x, retainer);

@@ -10,6 +10,7 @@ internal unsafe class Config
 {
     public HashSet<Guid> CompanionRequiredCleanupPlans = [];
     public HashSet<ulong> CompanionGcFirstCharacters = [];
+    // Legacy field name: manual storage/sales only; native ventures and gil are allowed.
     public HashSet<ulong> CompanionGilOnlyRetainers = [];
     public Dictionary<ulong, ulong> CompanionCurrencyRetainers = [];
     public Dictionary<ulong, string> CompanionPolicyOwners = [];

@@ -34,14 +34,17 @@ class StorageBoundary(unittest.TestCase):
   self.assertGreaterEqual(text.count('CompanionPolicy.AllowsSlot'),6)
   self.assertEqual(text.count('if(!StorageConfirmationAllowed())'),2)
   self.assertIn('slot->ItemId==pendingStorageItem&&slot->Quantity==pendingStorageQuantity',text)
- def test_gil_only_branch_skips_ventures_and_postprocess(self):
+ def test_manual_items_role_preserves_ventures_and_excludes_ordinary_item_work(self):
   text=(ROOT/'Scheduler/SchedulerMain.cs').read_text()
-  branch=text.split('if(C.CompanionGilOnlyRetainers.Contains(ret.RetainerID))')[1].split('VentureOverride = 0')[0]
+  branch=text.split('if(manualItems&&!VentureDue(ret,adata))')[1].split('VentureOverride = 0')[0]
   self.assertIn('TaskWithdrawGil.Enqueue(100)',branch)
   self.assertIn('return;',branch)
   self.assertIn('TaskPostprocessRetainerIPC.Enqueue(retainer,"Steward")',branch)
   self.assertIn('CompanionPolicy.StrategyDue(ret.RetainerID)',branch)
   self.assertNotIn('TaskReassignVenture',branch)
+  self.assertIn('if(!manualItems&&C.EnableEntrustManager && selectedPlan != null)',text)
+  self.assertIn('if(!manualItems&&Data.GetIMSettings().IMEnableAutoVendor)',text)
+  self.assertIn('VentureDue(r,adata)',text)
   self.assertIn('CompanionGilOnlyRetainers.Contains(retainer.RetainerID)',(ROOT/'Modules/CompanionStorage.cs').read_text())
  def test_gil_confirmation_rechecks_policy(self):
   self.assertIn('ProcessBankOrCancel(!global::AutoRetainer.Modules.CompanionPolicy.Allows("Gil",0))',(ROOT/'Scheduler/Tasks/TaskWithdrawGil.cs').read_text())

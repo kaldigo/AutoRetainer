@@ -41,7 +41,7 @@ internal static partial class CompanionPolicy
     }
     internal static unsafe bool SubmitSlot(string action,InventoryType type,int slot,Action native,uint removed=0,uint cabinetRow=0)
     {
-        if(!IsManaged){native();return true;}
+        if(!IsManaged){if(!AllowsSlot(action,type,slot))return false;native();return true;}
         if(submission!=null || ledger.Pending.Contains(Svc.ClientState.LocalContentId) || !AllowsSlot(action,type,slot))return false;
         var source=ReadIdentity(type,slot);if(source==null || source.ItemId==0 || source.Quantity==0)return false;
         var before=CountSource(source);if(before==null)return false;
@@ -57,7 +57,7 @@ internal static partial class CompanionPolicy
     }
     internal static unsafe bool SubmitArmoire(uint id,uint row,Action native)
     {
-        if(!IsManaged){native();return true;}
+        if(!CompanionAvailable)return false;
         foreach(var type in PolicyPlayerInventories)
         {
             var inventory=InventoryManager.Instance()->GetInventoryContainer(type);

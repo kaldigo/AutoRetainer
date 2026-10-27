@@ -1,3 +1,7 @@
+## 4.6.3.23
+
+Add safe standalone operation when Steward is absent, disconnected or unavailable: continue native entrust/retrieval, ventures and gil while pausing all disposal, automated market and glamour work. Gate fresh/unregistered profiles and final native submission paths as well as optional postprocessors. Keep uncertain transaction holds. Manual-items retainers, including Skaenwyda, now use the existing venture path when due, preserving the five-minute wait, gil withdrawal, item exclusions and strategy throttle.
+
 ## 4.6.3.22
 
 Preflight unique-item entrust conflicts against live retainer contents. Report and skip an already-owned unique item before submitting a game command, then continue with other items. Preserve ordinary duplicate stacking and the native entrust executor. Apply the same eligibility check to companion overflow.

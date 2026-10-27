@@ -91,6 +91,7 @@ public unsafe class CabinetManager : IDisposable
 
     public void EnqueueGoToInnAndDeliverEverything()
     {
+        if(!CompanionPolicy.CompanionAvailable)return;
         P.TaskManager.EnqueueTask(NeoTasks.ApproachObjectViaAutomove(GetArmoire, 4.4f));
         P.TaskManager.EnqueueTask(NeoTasks.InteractWithObject(GetArmoire));
         P.TaskManager.Enqueue(() =>
@@ -145,6 +146,7 @@ public unsafe class CabinetManager : IDisposable
 
     public bool EnqueueAllDeliverableItems()
     {
+        if(!CompanionPolicy.CompanionAvailable)return false;
         if(TryGetAddonByName<AtkUnitBase>("Cabinet", out var addon) && addon->IsReady() && TryGetStoredCabinetItems(out var cached, out var storedItems) && !cached)
         {
             foreach(var x in Utils.PlayerInventoryWithArmory)
@@ -205,6 +207,7 @@ public unsafe class CabinetManager : IDisposable
 
     public bool CanDeliverCabinet()
     {
+        if(!CompanionPolicy.CompanionAvailable)return false;
         if(TryGetStoredCabinetItems(out _, out var storedItems))
         {
             foreach(var x in Utils.PlayerInventoryWithArmory)

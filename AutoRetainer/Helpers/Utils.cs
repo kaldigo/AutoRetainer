@@ -1476,7 +1476,7 @@ public static unsafe class Utils
         {
             foreach(var z in data.GetEnabledRetainers())
             {
-                if(z.GetVentureSecondsRemaining() < 5 * 60) return false;
+                if(PolicyStandalone.FinishesSoon(z.GetVentureSecondsRemaining())) return false;
             }
         }
         return true;

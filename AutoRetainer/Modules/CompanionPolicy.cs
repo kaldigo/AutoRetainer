@@ -18,8 +18,9 @@ internal static partial class CompanionPolicy
     private static bool ready;
     internal static bool StartupBlocked=>!ready;
     internal static bool ControlActive => control.Active;
-    internal static string Status = "No companion connected";
+    internal static string Status = "Standalone: native entrust, ventures and gil; disposal, sales and glamour paused";
     internal static bool IsManaged => ledger.Owners.ContainsKey(Svc.ClientState.LocalContentId);
+    internal static bool CompanionAvailable=>ready&&IsManaged&&Connected(Svc.ClientState.LocalContentId)&&!HasFault;
     internal static bool UsesStewardCleanupPlan => Data!=null&&C.CompanionRequiredCleanupPlans.Contains(Data.GetIMSettings().GUID);
     internal static bool HasFault => IsManaged && ledger.Faults.Contains(Svc.ClientState.LocalContentId);
 
@@ -39,11 +40,11 @@ internal static partial class CompanionPolicy
         Svc.PluginInterface.GetIpcProvider<string>("AutoRetainer.InventoryPolicy.CleanupStatus").RegisterFunc(()=>CleanupStatus);
         Svc.PluginInterface.GetIpcProvider<ulong,ulong,uint,bool>("AutoRetainer.InventoryPolicy.CleanupWithdrawalConfirmed").RegisterFunc(CleanupWithdrawalConfirmed);
         Svc.PluginInterface.GetIpcProvider<uint,uint,bool>("AutoRetainer.InventoryPolicy.DisposalSelected").RegisterFunc((id,quantity)=>
-            !Data.GetIMSettings().IMDry&&Utils.IsItemSelectedByHardList(id,quantity)&&
+            CompanionAvailable&&!Data.GetIMSettings().IMDry&&Utils.IsItemSelectedByHardList(id,quantity)&&
             (GcDisposalCandidate(id)||Data.GetIMSettings().IMEnableAutoVendor||Data.GetIMSettings().IMEnableNpcSell||DesynthDisposalEligible(id)));
         Svc.PluginInterface.GetIpcProvider<uint,uint,string>("AutoRetainer.InventoryPolicy.DisposalPreview").RegisterFunc(DisposalPreview);
         Svc.Framework.Update+=Tick;
-        Svc.PluginInterface.GetIpcProvider<int>("AutoRetainer.InventoryPolicy.StorageVersion").RegisterFunc(()=>4);
+        Svc.PluginInterface.GetIpcProvider<int>("AutoRetainer.InventoryPolicy.StorageVersion").RegisterFunc(()=>5);
         Svc.PluginInterface.GetIpcProvider<ulong,ulong,bool>("AutoRetainer.InventoryPolicy.MigrateStorageRouting").RegisterFunc(MigrateStorageRouting);
         Svc.PluginInterface.GetIpcProvider<ulong,string,bool>("AutoRetainer.InventoryPolicy.StoragePlanAllows").RegisterFunc(StoragePlanAllows);
         Svc.PluginInterface.GetIpcProvider<int>("AutoRetainer.InventoryPolicy.Version").RegisterFunc(() => Version);
@@ -145,7 +146,9 @@ internal static partial class CompanionPolicy
         return true;
     }
 
-    private static bool Connected(ulong cid) => HandoffLease.Owns(cid,character,Svc.ClientState.LocalContentId,
+    private static bool ProviderAvailable
+    {get{try{return callback!=null&&Svc.PluginInterface.GetIpcSubscriber<string,string>(callback).HasFunction;}catch{return false;}}}
+    private static bool Connected(ulong cid) => ProviderAvailable&&HandoffLease.Owns(cid,character,Svc.ClientState.LocalContentId,
         callback,heartbeat,Environment.TickCount64,true);
     private static bool AcquireControl(ulong cid)
     {
@@ -160,7 +163,7 @@ internal static partial class CompanionPolicy
 
     internal static void BeginHandoff(string plugin) => handoffCharacter=plugin=="Steward"?Svc.ClientState.LocalContentId:0;
     internal static void EndHandoff() => handoffCharacter=0;
-    private static bool OwnsHandoff(ulong cid) => cid==handoffCharacter && HandoffLease.Owns(handoffCharacter,character,
+    private static bool OwnsHandoff(ulong cid) => Connected(cid)&&cid==handoffCharacter && HandoffLease.Owns(handoffCharacter,character,
         Svc.ClientState.LocalContentId,callback,heartbeat,Environment.TickCount64,SchedulerMain.RetainerPostProcessLocked);
     private static void Tick(Dalamud.Plugin.Services.IFramework _)
     {
@@ -208,23 +211,25 @@ internal static partial class CompanionPolicy
             ()=>ledger.Owners[cid]=owner);
         character = 0;
         callback = null;
-        Status = "Companion detached; original AutoRetainer rules apply";
+        Status = "Standalone: native entrust, ventures and gil; disposal, sales and glamour paused";
         return true;
     }
 
     /// <summary>Checked at both candidate selection and submission. Explicit upstream protections win.</summary>
+    private static bool StandaloneAllows(string action,int container)=>PolicyStandalone.Allows(action,
+        container<0||Utils.RetainerInventoriesWithCrystals.Contains((InventoryType)container));
     internal static unsafe bool Allows(string action, uint itemId, uint quantity = 1, int container = -1, int slot = -1,bool ownSubmission=false)
     {
         if(!ready || ControlActive || HasFault || submission!=null&&!ownSubmission)return false;
         var cid = Svc.ClientState.LocalContentId;
         if(cid == 0) return false;
-        if(!ledger.Owners.TryGetValue(cid, out var owner))
-            return action is not ("Gc" or "Desynth" or "Vendor")||!C.CompanionRequiredCleanupPlans.Contains(Data.GetIMSettings().GUID);
         if(ledger.Pending.Contains(cid) && action!="Gc" && !ownSubmission)return false;
-        if(character != cid || callback != owner || Environment.TickCount64 - heartbeat > 5000)
+        if(!ledger.Owners.TryGetValue(cid, out var owner))
+            return StandaloneAllows(action,container);
+        if(character != cid || callback != owner || Environment.TickCount64 - heartbeat > 5000 || !ProviderAvailable)
         {
-            Status = "Managed item actions paused: companion unavailable";
-            return false;
+            Status = "Standalone: Steward unavailable; disposal, sales and glamour paused";
+            return StandaloneAllows(action,container);
         }
         try
         {
@@ -237,9 +242,9 @@ internal static partial class CompanionPolicy
         }
         catch(Exception ex)
         {
-            Status = "Managed item actions paused: policy call failed";
+            Status = "Standalone: Steward policy unavailable; disposal, sales and glamour paused";
             Svc.Log.Debug(ex, Status);
-            return false;
+            return !HasFault&&!ControlActive&&!ledger.Pending.Contains(cid)&&StandaloneAllows(action,container);
         }
     }
 
@@ -335,7 +340,6 @@ internal static partial class CompanionPolicy
     internal static unsafe bool AllowsDresserBatch()
     {
         if(!ready)return false;
-        if(!ledger.Owners.ContainsKey(Svc.ClientState.LocalContentId)) return true;
         // The bulk IPC has no final per-item policy callback, and can outlive the companion lease.
         Status = "Managed bulk dresser storage held: use individually validated transfers";
         return false;
