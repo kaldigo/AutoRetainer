@@ -6,6 +6,30 @@ namespace AutoRetainer.Modules;
 
 internal static partial class CompanionPolicy
 {
+    private static readonly Dictionary<(ulong,uint),long> entrustSkips=[];
+    private static unsafe bool UniqueEntrustAllowed(ulong retainer,uint id,bool report=false)
+    {
+        if(!Svc.Data.GetExcelSheet<Lumina.Excel.Sheets.Item>().TryGetRow(id,out var item))return false;
+        if(!item.IsUnique)return true;
+        var selected=RetainerManager.Instance();long? copies=null;
+        if(selected!=null&&selected->LastSelectedRetainerId==retainer)
+        {
+            var nq=CountStored(id,false);var hq=CountStored(id,true);
+            if(nq.HasValue&&hq.HasValue)copies=nq.Value+hq.Value;
+        }
+        if(PolicyStorageRouting.UniqueFits(true,copies))return true;
+        if(report&&copies>0)
+        {
+            var key=(retainer,id);var now=Environment.TickCount64;
+            if(!entrustSkips.TryGetValue(key,out var last)||now-last>=60000)
+            {
+                entrustSkips[key]=now;
+                var message=$"Skipped entrusting {item.Name}: this retainer already owns the unique item. Continuing with other items.";
+                Svc.Log.Warning(message);Svc.Chat.Print("[AutoRetainer] "+message);
+            }
+        }
+        return false;
+    }
     private static bool MigrateStorageRouting(ulong cid,ulong legacyCurrencyRetainer)
     {
         if(!Connected(cid))return false;
@@ -36,6 +60,7 @@ internal static partial class CompanionPolicy
         var planId=extra.EntrustPlan;
         var plan=C.EntrustPlans.FirstOrDefault(p=>p.Guid==planId);
         if(plan==null||plan.ManualPlan||!StorageScopeAllows(cid,source.Retainer,source.ItemId))return false;
+        if(!UniqueEntrustAllowed(source.Retainer,source.ItemId))return false;
         if(!Svc.Data.GetExcelSheet<Lumina.Excel.Sheets.Item>().TryGetRow(source.ItemId,out var item))return false;
         var category=plan.EntrustCategories.FirstOrDefault(c=>c.ID==item.ItemUICategory.RowId);
         var explicitItem=plan.EntrustItems.Contains(source.ItemId);

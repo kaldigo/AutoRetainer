@@ -236,5 +236,9 @@ Check(!PolicyStorageRouting.Selects(false,0,null,30,true,false,null,999),"Unknow
 Check(PolicyStorageRouting.Selects(false,0,null,30,true,false,5,999),"Duplicate-only plan requires an existing live stack");
 Check(!PolicyStorageRouting.Selects(false,0,null,30,true,false,999,999),"Full duplicate stack stays held");
 Check(PolicyStorageRouting.Selects(false,0,null,30,true,true,999,999),"Multi-stack duplicate option is respected");
+Check(!PolicyStorageRouting.UniqueFits(true,1),"Already stored unique item is skipped before an entrust command");
+Check(!PolicyStorageRouting.UniqueFits(true,null),"Unknown destination contents cannot approve a unique deposit");
+Check(PolicyStorageRouting.UniqueFits(true,0),"Missing unique item can be entrusted");
+Check(PolicyStorageRouting.UniqueFits(false,1),"Ordinary duplicates retain native stacking behavior");
 SettingsChecks.Run(Check);
 Console.WriteLine($"{total} checks passed including live inherited protection without candidate-list cloning.");

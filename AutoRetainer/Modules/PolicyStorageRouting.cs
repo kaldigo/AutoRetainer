@@ -2,6 +2,7 @@ namespace AutoRetainer.Modules;
 
 internal static class PolicyStorageRouting
 {
+    public static bool UniqueFits(bool unique,long? stored)=>!unique||stored==0;
     public static bool Allows(ulong currencyRetainer,ulong target,bool equipment,bool marketable,uint category)
     {
         if(currencyRetainer==0)return true;

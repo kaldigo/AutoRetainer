@@ -1,3 +1,7 @@
+## 4.6.3.22
+
+Preflight unique-item entrust conflicts against live retainer contents. Report and skip an already-owned unique item before submitting a game command, then continue with other items. Preserve ordinary duplicate stacking and the native entrust executor. Apply the same eligibility check to companion overflow.
+
 ## 4.6.3.21
 
 Make AutoRetainer the sole storage-routing authority with read-only live plan eligibility for Steward overflow and one-time migration of the currency/nonmarketable role into AutoRetainer settings. Preserve native entrust execution and protection checks. Prepared managed cleanup plans can select explicitly permitted non-equipment categories through Steward; retain native methods and stack limits, and explain stack-limit holds in previews.

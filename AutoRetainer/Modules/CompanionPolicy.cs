@@ -251,6 +251,7 @@ internal static partial class CompanionPolicy
         if(inv == null || !inv->IsLoaded || slot < 0 || slot >= inv->Size) return false;
         var item = inv->GetInventorySlot(slot);
         if(item==null || item->ItemId==0 || item->Quantity<=0)return false;
+        if(action=="Entrust"&&!UniqueEntrustAllowed(RetainerManager.Instance()==null?0:RetainerManager.Instance()->LastSelectedRetainerId,item->ItemId,true))return false;
         if(action=="Entrust"&&!StorageScopeAllows(Svc.ClientState.LocalContentId,RetainerManager.Instance()==null?0:RetainerManager.Instance()->LastSelectedRetainerId,item->ItemId))return false;
         var expected=new PolicyItemIdentity(item->ItemId,(uint)item->Quantity,(uint)container,slot,(int)item->Flags);
         if(Data.GetIMSettings().IMProtectList.Contains(expected.ItemId))return false;

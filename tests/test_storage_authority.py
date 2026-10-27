@@ -4,6 +4,16 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1] / 'AutoRetainer'
 
 class StorageAuthority(unittest.TestCase):
+    def test_unique_conflict_is_filtered_at_native_candidate_and_submission_boundary(self):
+        policy = (ROOT / 'Modules/CompanionPolicy.cs').read_text(encoding='utf-8')
+        slot = policy.split('internal static unsafe bool AllowsSlot')[1].split('private static bool Run')[0]
+        self.assertLess(slot.index('UniqueEntrustAllowed'), slot.index('if(!Allows(action'))
+        plans = (ROOT / 'Modules/CompanionStoragePlans.cs').read_text(encoding='utf-8')
+        self.assertIn('CountStored(id,false)', plans)
+        self.assertIn('CountStored(id,true)', plans)
+        self.assertIn('if(!item.IsUnique)return true;', plans)
+        self.assertIn('already owns the unique item. Continuing with other items.', plans)
+
     def test_overflow_uses_live_native_plan_and_source(self):
         text = (ROOT / 'Modules/CompanionStoragePlans.cs').read_text(encoding='utf-8')
         for gate in ['!C.EnableEntrustManager', 'plan.ManualPlan', 'plan.GetAllowedInventories()', 'identity.Quantity!=source.Quantity', 'PolicyStorageRouting.Selects', 'GetAdditionalDataKey(cid,retainer.Name,false)']:
