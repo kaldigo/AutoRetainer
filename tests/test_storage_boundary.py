@@ -15,6 +15,9 @@ class StorageBoundary(unittest.TestCase):
   self.assertIn('ConditionFlag.OccupiedSummoningBell',text)
   self.assertLess(text.index('P.TaskManager.Enqueue(()=>CloseBellForCollection'),text.index('S.CabinetManager.EnqueueGoToInnAndDeliverEverything'))
   self.assertIn('S.MirageManager.EnqueueGoToInnAndDeliverEverything(true)',text)
+  route=text.split('private static bool EnqueueCollectionVisit')[1].split('private static unsafe long? CountStored')[0]
+  self.assertLess(route.index('P.TaskManager.Enqueue(() =>'),route.index('S.CabinetManager.EnqueueGoToInnAndDeliverEverything'))
+  self.assertIn('Start collection route after closing bell',route)
 
  def test_storage_checks_candidates_and_numeric_confirmation(self):
   text=(ROOT/'Scheduler/Tasks/TaskEntrustDuplicates.cs').read_text()

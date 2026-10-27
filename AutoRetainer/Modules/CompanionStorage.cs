@@ -22,9 +22,14 @@ internal static partial class CompanionPolicy
     private static bool EnqueueCollectionVisit(ulong cid,bool armoire)
     {
         P.TaskManager.Enqueue(()=>CloseBellForCollection(cid),"Close bell before collection storage");
-        Svc.Log.Information("Steward collection route: opening {Storage}",armoire?"armoire":"glamour dresser");
-        if(armoire)S.CabinetManager.EnqueueGoToInnAndDeliverEverything();
-        else S.MirageManager.EnqueueGoToInnAndDeliverEverything(true);
+        P.TaskManager.Enqueue(() =>
+        {
+            if(!Connected(cid)||HasFault)return;
+            // The upstream route inserts inn travel at the front of the queue. Construct it only after the bell has closed.
+            Svc.Log.Information("Steward collection route: opening {Storage}",armoire?"armoire":"glamour dresser");
+            if(armoire)S.CabinetManager.EnqueueGoToInnAndDeliverEverything();
+            else S.MirageManager.EnqueueGoToInnAndDeliverEverything(true);
+        },"Start collection route after closing bell");
         return true;
     }
 
