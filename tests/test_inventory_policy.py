@@ -36,10 +36,18 @@ class IntegrationContract(unittest.TestCase):
   self.assertIn('private static bool ConfirmDiscard()\n    {\n        if(CompanionPolicy.IsManaged) return true;',text)
  def test_final_gc_confirmation_rechecks_live_policy(self):
   text=(ROOT/'AutoRetainer/Modules/GcHandin/AutoGCHandin.cs').read_text()
-  self.assertLess(text.index('if(!PendingAllowed())return false;'),text.index('new AddonMaster.GrandCompanySupplyReward(addon).Deliver()'))
-  self.assertIn('!pendingDelivered || !PendingAllowed()',text)
+  self.assertLess(text.index('if(!PendingAllowed(MatchesPendingReward(&addon->AtkUnitBase)))return false;'),text.index('new AddonMaster.GrandCompanySupplyReward(addon).Deliver()'))
+  self.assertIn('PendingAllowed(pendingDelivered && PolicyDialog.Matches(pendingRewardId,addon->ParentId,addon->HostId))',text)
   self.assertIn('var pending=pendingConfirmation;',text)
   self.assertIn('InventoryFingerprint(pending.ItemId)',text)
+  confirmation=text.split('private static bool PendingAllowed(')[1].split('private static bool MatchesPendingReward')[0]
+  self.assertNotIn('GetHandinItems',confirmation)
+  self.assertNotIn('items[pendingIndex]',confirmation)
+ def test_gc_approval_is_captured_only_for_an_actual_selection(self):
+  text=(ROOT/'AutoRetainer/Modules/GcHandin/AutoGCHandin.cs').read_text().split('internal static void InvokeHandin(')[1].split('internal static bool HasInInventory')[0]
+  self.assertLess(text.index('FrameThrottler.Throttle'),text.index('pendingConfirmation=new'))
+  self.assertIn('dialog->IsVisible',text)
+  self.assertLess(text.index('pendingConfirmation=new'),text.index('Callback.Fire'))
  def test_quick_sell_and_low_level_sales_are_gated(self):
   text=(ROOT/'AutoRetainer/Modules/QuickSellItems.cs').read_text()
   self.assertIn('!CompanionPolicy.AllowsSlot("Vendor"',text)

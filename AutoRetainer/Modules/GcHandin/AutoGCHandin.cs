@@ -62,25 +62,23 @@ internal static unsafe class AutoGCHandin
         loaded=true;return copies.Count==0?null:string.Join(";",copies);
     }
 
-    private static bool PendingAllowed()
+    private static bool PendingAllowed(bool matchesDialog)
     {
         if(!CompanionPolicy.IsManaged)return true;
-        var items=GetHandinItems();
         var pending=pendingConfirmation;
-        var indexValid=pendingIndex>=0&&pendingIndex<items.Count;
         string fingerprint=null;
         bool? permitted=null;
-        if(pending!=null&&indexValid)
+        if(pending!=null)
         {
             fingerprint=InventoryFingerprint(pending.ItemId);
             permitted=!Data.GetIMSettings().IMProtectList.Contains(pending.ItemId) &&
                 !S.CabinetManager.ShouldExcludeItemFromProcessing(pending.ItemId) &&
                 CompanionPolicy.Allows("Gc",pending.ItemId);
-            if(pending.StillValid(Svc.ClientState.LocalContentId,items[pendingIndex].ItemID,
+            if(pending.DialogStillValid(Svc.ClientState.LocalContentId,matchesDialog,
                 fingerprint,Environment.TickCount64,permitted.Value))return true;
         }
         // Capture which unchanged guard failed. Do not infer permission or confirm a different item.
-        Svc.Log.Warning($"[Steward GC] Confirmation rejected: pending item={pending?.ItemId}, index={pendingIndex}, list count={items.Count}, live row item={(indexValid?items[pendingIndex].ItemID:0)}, character matches={pending?.Character==Svc.ClientState.LocalContentId}, age ms={(pending==null?-1:Environment.TickCount64-pending.Started)}, permitted={permitted}, expected source={pending?.Fingerprint}, live source={fingerprint}, delivered={pendingDelivered}, submitted={deliveryGate.Submitted}");
+        Svc.Log.Warning($"[Steward GC] Confirmation rejected: pending item={pending?.ItemId}, selected index={pendingIndex}, dialog matches={matchesDialog}, character matches={pending?.Character==Svc.ClientState.LocalContentId}, age ms={(pending==null?-1:Environment.TickCount64-pending.Started)}, permitted={permitted}, expected source={pending?.Fingerprint}, live source={fingerprint}, delivered={pendingDelivered}, submitted={deliveryGate.Submitted}");
         HoldPending("GC confirmation lost its item, inventory, permission or lease");
         return false;
     }
@@ -188,8 +186,7 @@ internal static unsafe class AutoGCHandin
             if(addon->DeliverButton->IsEnabled && FrameThrottler.Throttle(Throttler, 10))
             {
                 if(CompanionPolicy.IsManaged && deliveryGate.Submitted)return false;
-                if(!PendingAllowed())return false;
-                if(!MatchesPendingReward(&addon->AtkUnitBase)){HoldPending("GC reward dialog did not match the pending item");return false;}
+                if(!PendingAllowed(MatchesPendingReward(&addon->AtkUnitBase)))return false;
                 if(CompanionPolicy.IsManaged && !deliveryGate.Submit(true))return false;
                 pendingRewardId=addon->Id;
                 pendingDelivered=true;
@@ -226,8 +223,7 @@ internal static unsafe class AutoGCHandin
                     if(CompanionPolicy.IsManaged)
                     {
                         if(hqGate.Submitted)return false;
-                        if(!pendingDelivered || !PendingAllowed())return false;
-                        if(!PolicyDialog.Matches(pendingRewardId,addon->ParentId,addon->HostId)){HoldPending("HQ confirmation was not owned by the pending GC reward");return false;}
+                        if(!PendingAllowed(pendingDelivered && PolicyDialog.Matches(pendingRewardId,addon->ParentId,addon->HostId)))return false;
                     }
                     if(FrameThrottler.Throttle(Throttler, 10))
                     {
@@ -413,9 +409,11 @@ internal static unsafe class AutoGCHandin
     {
         var liveItems = GetHandinItems();
         if(which < 0 || which >= liveItems.Count || !CompanionPolicy.Allows("Gc", liveItems[which].ItemID)) return;
+        if(!FrameThrottler.Throttle("AutoGCHandinCallback", 10))return;
         if(CompanionPolicy.IsManaged)
         {
-            if(TryGetAddonByName<AtkUnitBase>("GrandCompanySupplyReward",out _) || TryGetAddonByName<AtkUnitBase>("SelectYesno",out _))return;
+            foreach(var name in new[]{"GrandCompanySupplyReward","SelectYesno"})
+                if(TryGetAddonByName<AtkUnitBase>(name,out var dialog) && dialog->IsVisible)return;
             var fingerprint=InventoryFingerprint(liveItems[which].ItemID,out var quantity);
             if(fingerprint==null)return;
             pendingConfirmation=new(Svc.ClientState.LocalContentId,liveItems[which].ItemID,fingerprint,Environment.TickCount64);
@@ -423,11 +421,8 @@ internal static unsafe class AutoGCHandin
             pendingQuantity=quantity;pendingSubmitted=0;
             deliveryGate=new();hqGate=new();
         }
-        if(FrameThrottler.Throttle("AutoGCHandinCallback", 10))
-        {
-            if(CompanionPolicy.IsManaged)Svc.Log.Information($"[Steward GC] Selection submitted: item={pendingConfirmation?.ItemId}, index={which}, list count={liveItems.Count}, source={pendingConfirmation?.Fingerprint}");
-            Callback.Fire(addon, true, 1, which, Callback.ZeroAtkValue);
-        }
+        if(CompanionPolicy.IsManaged)Svc.Log.Information($"[Steward GC] Selection submitted: item={pendingConfirmation?.ItemId}, index={which}, list count={liveItems.Count}, source={pendingConfirmation?.Fingerprint}");
+        Callback.Fire(addon, true, 1, which, Callback.ZeroAtkValue);
     }
 
     internal static bool HasInInventory(uint itemID)

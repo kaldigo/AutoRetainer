@@ -17,6 +17,20 @@ Check(!new PolicyConfirmation(0,42,"slot",1000).StillValid(0,42,"slot",1001,true
 Check(!new PolicyConfirmation(12,0,"slot",1000).StillValid(12,0,"slot",1001,true),"No item");
 Check(!new PolicyConfirmation(12,42,"",1000).StillValid(12,42,"",1001,true),"Empty inventory evidence");
 var endpoint="Steward.InventoryPolicy.Evaluate";
+// Reproduce the observed GC modal transition: approval survives the hidden list,
+// but a matching dialog alone never overrides live inventory/policy evidence.
+Check(pending.DialogStillValid(12,true,pending.Fingerprint,1047,true),"GC reward uses captured approval after its selection list disappears");
+Check(!pending.DialogStillValid(12,false,pending.Fingerprint,1047,true),"Different or unidentified GC reward is denied");
+Check(!pending.DialogStillValid(13,true,pending.Fingerprint,1047,true),"GC character change is denied");
+Check(!pending.DialogStillValid(12,true,null,1047,true),"GC unloaded inventory is denied");
+Check(!pending.DialogStillValid(12,true,"Inventory1/1/42/1/None",1047,true),"GC moved source is denied");
+Check(!pending.DialogStillValid(12,true,"Inventory1/0/42/2/None",1047,true),"GC changed quantity is denied");
+Check(!pending.DialogStillValid(12,true,"Inventory1/0/42/1/HighQuality",1047,true),"GC changed quality is denied");
+Check(!pending.DialogStillValid(12,true,pending.Fingerprint,1047,false),"New protection or lost Steward permission denies GC confirmation");
+Check(!pending.DialogStillValid(12,true,pending.Fingerprint,11001,true),"GC expired approval is denied even with a matching reward");
+Check(!pending.DialogStillValid(12,true,pending.Fingerprint,999,true),"GC invalid approval clock is denied");
+Check(!pending.DialogStillValid(12,PolicyDialog.Matches(5,6,7),pending.Fingerprint,1050,true),"Unrelated HQ dialog is denied");
+Check(pending.DialogStillValid(12,PolicyDialog.Matches(5,5,7),pending.Fingerprint,1050,true),"Owned HQ follow-up uses the same approval without the hidden list");
 Check(HandoffLease.Owns(12,12,12,endpoint,1000,1001,true),"Current Steward lease owns its handoff");
 Check(!HandoffLease.Owns(0,12,12,endpoint,1000,1001,true),"A locked handoff alone is not Steward ownership");
 Check(!HandoffLease.Owns(12,13,12,endpoint,1000,1001,true),"Different connected character cannot own handoff");

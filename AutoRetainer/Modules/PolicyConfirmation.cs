@@ -2,6 +2,11 @@ namespace AutoRetainer.Modules;
 
 internal sealed record PolicyConfirmation(ulong Character, uint ItemId, string Fingerprint, long Started)
 {
+    // A modal confirmation replaces the selection list. Bind it to the captured approval,
+    // not to a row in the now-hidden list; callers supply the live dialog identity check.
+    internal bool DialogStillValid(ulong character, bool matchesDialog, string fingerprint, long now, bool permitted) =>
+        matchesDialog && StillValid(character,ItemId,fingerprint,now,permitted);
+
     internal bool StillValid(ulong character, uint item, string fingerprint, long now, bool permitted) =>
         permitted && Character!=0 && Character==character && ItemId!=0 && ItemId==item &&
         !string.IsNullOrEmpty(Fingerprint) && Fingerprint==fingerprint && now>=Started && now-Started<=10000;
