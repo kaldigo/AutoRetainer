@@ -40,3 +40,12 @@ class StorageAuthority(unittest.TestCase):
         desynth = (ROOT / 'Scheduler/Tasks/TaskDesynthItems.cs').read_text(encoding='utf-8')
         self.assertIn('IsOnIMList(item->ItemId,item->Quantity)', desynth)
         self.assertIn('Utils.IsItemSelectedByHardList(itemID,quantity)', desynth)
+
+    def test_followup_uses_native_entrust_without_companion_withdrawals(self):
+        policy=(ROOT/'Modules/CompanionPolicy.cs').read_text()
+        self.assertIn('case "Entrust": return EnqueueOverflow(cid,entrustOnly:true);',policy)
+        storage=(ROOT/'Modules/CompanionStorage.cs').read_text()
+        for gate in ['!Connected(cid)||HasFault','!C.EnableEntrustManager||plan==null','!p.ManualPlan','C.CompanionGilOnlyRetainers.Contains(retainerId)']:
+            self.assertIn(gate,storage)
+        self.assertIn('if(entrustOnly)TaskEntrustDuplicates.EnqueueNew(plan!);',storage)
+        self.assertIn('else TaskPostprocessRetainerIPC.Enqueue(name,"Steward");',storage)

@@ -1,3 +1,7 @@
+## 4.6.3.26
+
+Add a companion-requested entrust-only follow-up using existing native plans and the existing entrust executor. Skip manual-item retainers and manual/unassigned plans. Do not run disposal, market, ventures or collection postprocessing in this pass; retain final per-slot protections.
+
 ## 4.6.3.25
 
 Exclude items with zero or unavailable NPC sale value from managed vendor withdrawal planning and final sale permission. Explain the hold in disposal previews while preserving eligible GC/desynthesis routes. Prevent unsellable items such as Eternity Cake from being submitted and then timing out waiting for an impossible inventory reduction. Preserve native executors and strict acknowledgement checks.

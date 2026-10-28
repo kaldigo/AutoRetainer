@@ -78,7 +78,7 @@ internal static partial class CompanionPolicy
             ()=>P.Memory.RetainerItemCommandDetour(InventorySpaceManager.AgentRetainerItemCommandModule,
                 (uint)expected.Slot,(InventoryType)expected.Container,0,RetainerItemCommand.EntrustToRetainer),1);
     }
-    private static unsafe bool EnqueueOverflow(ulong cid,bool collection=false,bool disposalOnly=false)
+    private static unsafe bool EnqueueOverflow(ulong cid,bool collection=false,bool disposalOnly=false,bool entrustOnly=false)
     {
         if(!Connected(cid)||HasFault||Utils.GetReachableRetainerBell(true)==null||!ECommons.GameHelpers.Player.IsInHomeWorld)return false;
         P.SkipNextEnable=true;
@@ -87,13 +87,13 @@ internal static partial class CompanionPolicy
         P.TaskManager.Enqueue(() =>
         {
             if(!Connected(cid)||HasFault)return true;
-            P.TaskManager.InsertStack(() => EnqueueRetainers(cid,collection,disposalOnly));
+            P.TaskManager.InsertStack(() => EnqueueRetainers(cid,collection,disposalOnly,entrustOnly));
             return true;
         },"Steward protected overflow retainers");
         P.TaskManager.Enqueue(RetainerListHandlers.CloseRetainerList);
         return true;
     }
-    private static unsafe void EnqueueRetainers(ulong cid,bool collection,bool disposalOnly=false)
+    private static unsafe void EnqueueRetainers(ulong cid,bool collection,bool disposalOnly=false,bool entrustOnly=false)
     {
         var rm=RetainerManager.Instance();if(rm==null||!rm->IsReady)return;
         foreach(var retainer in Internal.GameRetainerManager.Retainers)
@@ -104,19 +104,24 @@ internal static partial class CompanionPolicy
             if(string.IsNullOrWhiteSpace(name))continue;
             P.TaskManager.Enqueue(()=>
             {
+                if(!Connected(cid)||HasFault)return true;
+                var extra=C.AdditionalData.GetValueOrDefault(Utils.GetAdditionalDataKey(cid,name,false));
+                var plan=C.EntrustPlans.FirstOrDefault(p=>p.Guid==extra?.EntrustPlan&&!p.ManualPlan);
+                if(entrustOnly&&(!C.EnableEntrustManager||plan==null||C.CompanionGilOnlyRetainers.Contains(retainerId)))return true;
                 if(disposalOnly)
                 {
                     if(!cleanup.Active||!CleanupRetainerAllowed(cid,retainerId))return true;
                     cleanup.Visited++;
                     if(Utils.GetInventoryFreeSlotCount()<2)return true;
                 }
-                else if(!(collection?NeedsCollection(cid):NeedsOverflow(cid)))return true;
+                else if(!entrustOnly&&!(collection?NeedsCollection(cid):NeedsOverflow(cid)))return true;
                 Svc.Log.Information("Steward {Operation}: selecting retainer {RetainerName} ({RetainerId})",
-                    collection?"collection":"overflow",name,retainerId);
+                    entrustOnly?"post-dresser entrust":collection?"collection":"overflow",name,retainerId);
                 P.TaskManager.InsertStack(()=>
                 {
                     TaskSelectRetainer.Enqueue(name);
-                    TaskPostprocessRetainerIPC.Enqueue(name,"Steward");
+                    if(entrustOnly)TaskEntrustDuplicates.EnqueueNew(plan!);
+                    else TaskPostprocessRetainerIPC.Enqueue(name,"Steward");
                     P.TaskManager.Enqueue(RetainerHandlers.SelectQuit);
                     P.TaskManager.Enqueue(RetainerHandlers.ConfirmCantBuyback);
                 });

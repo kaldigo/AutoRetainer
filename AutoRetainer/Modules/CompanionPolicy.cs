@@ -278,6 +278,7 @@ internal static partial class CompanionPolicy
         if(operation is "Gc" or "Desynth" or "Vendor" && Data.GetIMSettings().IMDry)return false;
         switch(operation)
         {
+            case "Entrust": return EnqueueOverflow(cid,entrustOnly:true);
             case "Overflow": return EnqueueOverflow(cid);
             case "Collect": return EnqueueOverflow(cid,true);
             case "Armoire": return EnqueueCollectionVisit(cid,true);
