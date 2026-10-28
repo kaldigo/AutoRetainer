@@ -1,3 +1,7 @@
+## 4.6.3.25
+
+Exclude items with zero or unavailable NPC sale value from managed vendor withdrawal planning and final sale permission. Explain the hold in disposal previews while preserving eligible GC/desynthesis routes. Prevent unsellable items such as Eternity Cake from being submitted and then timing out waiting for an impossible inventory reduction. Preserve native executors and strict acknowledgement checks.
+
 ## 4.6.3.24
 
 Accept desynthesis output reusing the fully consumed single item's source slot when the exact source-item aggregate loss is confirmed. Wait for native busy state to finish before acknowledgement. Keep strict source-slot handling for other actions and partial stacks; missing counts, unexpected losses and expired submissions remain review holds. Add regression cases matching the observed mansion-wall failures and log confirmed desynthesis acknowledgements.

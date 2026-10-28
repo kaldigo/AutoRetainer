@@ -41,7 +41,7 @@ internal static partial class CompanionPolicy
         Svc.PluginInterface.GetIpcProvider<ulong,ulong,uint,bool>("AutoRetainer.InventoryPolicy.CleanupWithdrawalConfirmed").RegisterFunc(CleanupWithdrawalConfirmed);
         Svc.PluginInterface.GetIpcProvider<uint,uint,bool>("AutoRetainer.InventoryPolicy.DisposalSelected").RegisterFunc((id,quantity)=>
             CompanionAvailable&&!Data.GetIMSettings().IMDry&&Utils.IsItemSelectedByHardList(id,quantity)&&
-            (GcDisposalCandidate(id)||Data.GetIMSettings().IMEnableAutoVendor||Data.GetIMSettings().IMEnableNpcSell||DesynthDisposalEligible(id)));
+            (GcDisposalCandidate(id)||(Data.GetIMSettings().IMEnableAutoVendor||Data.GetIMSettings().IMEnableNpcSell)&&VendorDisposalEligible(id)||DesynthDisposalEligible(id)));
         Svc.PluginInterface.GetIpcProvider<uint,uint,string>("AutoRetainer.InventoryPolicy.DisposalPreview").RegisterFunc(DisposalPreview);
         Svc.Framework.Update+=Tick;
         Svc.PluginInterface.GetIpcProvider<int>("AutoRetainer.InventoryPolicy.StorageVersion").RegisterFunc(()=>5);
@@ -66,6 +66,8 @@ internal static partial class CompanionPolicy
         Svc.PluginInterface.GetIpcProvider<ulong,string,object>("AutoRetainer.InventoryPolicy.Hold").RegisterAction((cid,reason)=>{if(Connected(cid))ReportFault(reason,false);});
     }
     private static bool DesynthDisposalEligible(uint id)=>Scheduler.Tasks.TaskDesynthItems.DesynthEligible(id);
+    private static bool VendorDisposalEligible(uint id)=>PolicyDisposal.CanVendor(
+        Svc.Data.GetExcelSheet<Lumina.Excel.Sheets.Item>().TryGetRow(id,out var item)?item.PriceLow:null);
     internal static bool NonEquipmentDisposalSelected(uint id)
     {
         var cid=Svc.ClientState.LocalContentId;
@@ -82,7 +84,8 @@ internal static partial class CompanionPolicy
                 ?$"Held by AutoRetainer stack limit: {quantity} in source; requires fewer than {mode.IMAutoVendorHardStackLimit}"
                 :"Not selected by AutoRetainer cleanup plan";
         var method=GcDisposalCandidate(id)?"GC delivery":DesynthDisposalEligible(id)?"Desynthesis":
-            mode.IMEnableAutoVendor||mode.IMEnableNpcSell?"Selling":"No enabled disposal method";
+            (mode.IMEnableAutoVendor||mode.IMEnableNpcSell)&&VendorDisposalEligible(id)?"Selling":
+            !VendorDisposalEligible(id)?"Held: no NPC sale value and no eligible enabled GC/desynthesis route":"No enabled disposal method";
         return method+(mode.IMDry?"; AutoRetainer demo mode blocks disposal":"; subject to native checks and Steward approval");
     }
     private static bool GcDisposalCandidate(uint id)
@@ -94,7 +97,8 @@ internal static partial class CompanionPolicy
             item.Value.ItemUICategory.RowId.EqualsAny([.. Utils.ArmorsUICategories,.. Utils.WeaponsUICategories])&&
             item.Value.GetRarity().EqualsAny(ItemRarity.Green,ItemRarity.Pink,ItemRarity.Blue)&&item.Value.Desynth>0;
     }
-    private static bool DisposalMethodAllows(string action,uint id)=>action is not ("Gc" or "Desynth" or "Vendor")||PolicyDisposal.Allows(action,Data.GetIMSettings().IMDry,
+    private static bool DisposalMethodAllows(string action,uint id)=>action is not ("Gc" or "Desynth" or "Vendor")||
+        (action!="Vendor"||VendorDisposalEligible(id))&&PolicyDisposal.Allows(action,Data.GetIMSettings().IMDry,
         C.CompanionGcFirstCharacters.Contains(Svc.ClientState.LocalContentId)||cleanup.Active,GcDisposalCandidate(id),
         DesynthDisposalEligible(id));
     private static readonly Dictionary<ulong,long> strategyVisits=[];

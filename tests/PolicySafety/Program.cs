@@ -270,3 +270,8 @@ foreach(var entry in new[]{(Source:6381u,Output:8143u,Quantity:7u),(Source:6391u
     Check(PolicySlotAcknowledgement.Check(source with{Quantity=2},output,2,1,1,false,1000,4000,true)==PolicyAck.Failed,"Partial stack cannot be replaced by output");
 }
 Console.WriteLine($"{total} checks passed including desynthesis output slot reuse.");
+
+Check(!PolicyDisposal.CanVendor(null),"Unknown NPC sale value cannot permit vendor sale");
+Check(!PolicyDisposal.CanVendor(0),"Eternity Cake and other zero-price items cannot be vendored");
+Check(PolicyDisposal.CanVendor(1)&&PolicyDisposal.CanVendor(15840),"Positive NPC sale values permit vendor route eligibility");
+Console.WriteLine($"{total} checks passed including NPC sale-value eligibility.");
