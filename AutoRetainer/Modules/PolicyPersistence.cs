@@ -35,14 +35,18 @@ internal sealed record PolicyItemIdentity(uint ItemId,uint Quantity,uint Contain
 internal static class PolicySlotAcknowledgement
 {
     internal static PolicyAck Check(PolicyItemIdentity expected,PolicyItemIdentity current,long before,long? after,
-        uint removed,bool busy,long submitted,long now)
+        uint removed,bool busy,long submitted,long now,bool desynthSlotReuse=false)
     {
         if(current==null || after==null || removed==0 || removed>expected.Quantity || before<expected.Quantity ||
             now<submitted || now-submitted>10000)return PolicyAck.Failed;
         if(expected.Matches(current) && after==before)return PolicyAck.Waiting;
         var remaining=expected.Quantity-removed;
+        // Desynthesis outputs can immediately occupy the consumed gear's slot.
+        // Only a fully consumed single item with an exact aggregate loss qualifies.
+        var reused=desynthSlotReuse&&expected.Quantity==1&&removed==1&&current.ItemId!=0&&
+            current.ItemId!=expected.ItemId&&current.Quantity>0;
         var sourceMatches=current.Container==expected.Container && current.Slot==expected.Slot &&
-            (remaining==0 ? current.ItemId==0&&current.Quantity==0 : current.ItemId==expected.ItemId&&current.Quantity==remaining&&current.Flags==expected.Flags);
+            (remaining==0 ? current.ItemId==0&&current.Quantity==0||reused : current.ItemId==expected.ItemId&&current.Quantity==remaining&&current.Flags==expected.Flags);
         if(!sourceMatches || after!=before-removed)return PolicyAck.Failed;
         return busy?PolicyAck.Waiting:PolicyAck.Completed;
     }

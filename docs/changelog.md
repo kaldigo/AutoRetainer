@@ -1,3 +1,7 @@
+## 4.6.3.24
+
+Accept desynthesis output reusing the fully consumed single item's source slot when the exact source-item aggregate loss is confirmed. Wait for native busy state to finish before acknowledgement. Keep strict source-slot handling for other actions and partial stacks; missing counts, unexpected losses and expired submissions remain review holds. Add regression cases matching the observed mansion-wall failures and log confirmed desynthesis acknowledgements.
+
 ## 4.6.3.23
 
 Add safe standalone operation when Steward is absent, disconnected or unavailable: continue native entrust/retrieval, ventures and gil while pausing all disposal, automated market and glamour work. Gate fresh/unregistered profiles and final native submission paths as well as optional postprocessors. Keep uncertain transaction holds. Manual-items retainers, including Skaenwyda, now use the existing venture path when due, preserving the five-minute wait, gil withdrawal, item exclusions and strategy throttle.

@@ -1,5 +1,9 @@
 # Maintained AutoRetainer integration fork
 
+The user authorizes publishing completed, tested fixes during the current in-game testing workflow without a separate publish request. Verify release assets and shared feed; leave live saved settings and execution holds unchanged.
+
+Desynthesis output may reuse the consumed gear's slot. Only Desynth may acknowledge a different nonempty item in that exact slot when one single source item was fully consumed, aggregate source count fell by exactly one, and native busy state has ended. Other actions and partial stacks retain strict identity checks; unavailable evidence and timeout remain holds.
+
 Preserve AutoRetainer assembly, InternalName, display name, commands, configuration and existing IPC identity. Keep upstream functionality. Only add the optional Steward inventory policy boundary, recoloured upstream icon and checked release/update infrastructure. Never modify pinned submodules to chase dependency updates. Native acceptance must be reported separately from builds and logic tests. Do not submit AI-generated contributions to PunishXIV upstream; its CONTRIBUTING.md prohibits them.
 
 Steward-managed ordinary entrust/retrieval must consult the per-slot companion policy at candidate selection, command submission and numeric confirmation. Keep the existing upstream executor. Carry selected retainer identity in policy requests. The legacy CompanionGilOnlyRetainers field now marks manual item handling: native ventures and gil run, while automatic storage, vendor and ordinary postprocess are skipped; gil withdrawal must recheck permission at confirmation, including log-only denial.

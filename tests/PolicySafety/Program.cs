@@ -254,3 +254,19 @@ Check(!PolicyStandalone.VentureDue(-10,-5,0,false,false),"Unassigned retainer ca
 Check(!PolicyStandalone.Allows("Retrieve",false),"Standalone cannot misclassify market listing withdrawal as ordinary retrieval");
 SettingsChecks.Run(Check);
 Console.WriteLine($"{total} checks passed including live inherited protection without candidate-list cloning.");
+
+foreach(var entry in new[]{(Source:6381u,Output:8143u,Quantity:7u),(Source:6391u,Output:8149u,Quantity:1u)})
+{
+    var source=new PolicyItemIdentity(entry.Source,1,2,23,0);
+    var output=new PolicyItemIdentity(entry.Output,entry.Quantity,2,23,0);
+    Check(PolicySlotAcknowledgement.Check(source,output,1,0,1,true,1000,3500,true)==PolicyAck.Waiting,"Desynth output reusing source slot waits for animation");
+    Check(PolicySlotAcknowledgement.Check(source,output,1,0,1,false,1000,4000,true)==PolicyAck.Completed,"Exact consumed item and reused output slot acknowledges desynthesis");
+    Check(PolicySlotAcknowledgement.Check(source,output,1,0,1,false,1000,4000)==PolicyAck.Failed,"Other actions cannot accept reused source slots");
+    Check(PolicySlotAcknowledgement.Check(source,output,2,0,1,false,1000,4000,true)==PolicyAck.Failed,"Extra source loss still fails");
+    Check(PolicySlotAcknowledgement.Check(source,output,1,1,1,false,1000,4000,true)==PolicyAck.Failed,"Slot replacement without source loss still fails");
+    Check(PolicySlotAcknowledgement.Check(source,output with{Slot=24},1,0,1,false,1000,4000,true)==PolicyAck.Failed,"Another slot cannot acknowledge desynthesis");
+    Check(PolicySlotAcknowledgement.Check(source,output,1,null,1,false,1000,4000,true)==PolicyAck.Failed,"Unknown source count remains held");
+    Check(PolicySlotAcknowledgement.Check(source,output,1,0,1,false,1000,11001,true)==PolicyAck.Failed,"Late slot reuse cannot clear expired submission");
+    Check(PolicySlotAcknowledgement.Check(source with{Quantity=2},output,2,1,1,false,1000,4000,true)==PolicyAck.Failed,"Partial stack cannot be replaced by output");
+}
+Console.WriteLine($"{total} checks passed including desynthesis output slot reuse.");

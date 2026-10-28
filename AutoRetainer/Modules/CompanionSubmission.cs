@@ -85,7 +85,7 @@ internal static partial class CompanionPolicy
             var after=CountSource(pending.Source);
             var now=Environment.TickCount64;
             var result=PolicySlotAcknowledgement.Check(pending.Source,current,
-                pending.Before,after,pending.Removed,visible,pending.Started,now);
+                pending.Before,after,pending.Removed,visible,pending.Started,now,desynthSlotReuse:pending.Action=="Desynth");
             if(result==PolicyAck.Failed)
             {
                 Svc.Log.Warning("[Steward submission] Acknowledgement rejected: action={Action}, expected={Expected}, current={Current}, before={Before}, after={After}, removed={Removed}, busy={Busy}, elapsedMs={Elapsed}",
@@ -100,6 +100,7 @@ internal static partial class CompanionPolicy
             }
             if(result==PolicyAck.Completed)
             {
+                if(pending.Action=="Desynth")Svc.Log.Information("[Steward submission] Desynth acknowledged: item={Item}, before={Before}, after={After}, sourceNow={Current}",pending.Source.ItemId,pending.Before,after,current);
                 CompleteTransaction();submission=null;
                 if(pending.Action is "Vendor" or "Desynth")cleanup.ConfirmDisposal(pending.Removed);
             }
