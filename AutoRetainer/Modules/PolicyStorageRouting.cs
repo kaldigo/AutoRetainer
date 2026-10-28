@@ -2,6 +2,8 @@ namespace AutoRetainer.Modules;
 
 internal static class PolicyStorageRouting
 {
+    public static bool OwnsCompletedRun(ulong character,ulong owner,long capturedRevision,long currentRevision,bool enabled)=>
+        character!=0&&character==owner&&capturedRevision==currentRevision&&enabled;
     public static bool UniqueFits(bool unique,long? stored)=>!unique||stored==0;
     public static bool Allows(ulong currencyRetainer,ulong target,bool equipment,bool marketable,uint category)
     {

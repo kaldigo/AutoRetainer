@@ -8,11 +8,27 @@ namespace AutoRetainer.Modules;
 
 internal static partial class CompanionPolicy
 {
+    private static ulong storageSchedulerOwner;
+    private static long storageSchedulerRevision;
+    private static bool FinishStorage(ulong cid)
+    {
+        if(!Connected(cid)||HasFault||ledger.Pending.Contains(cid)||ControlActive||SchedulerMain.RetainerPostProcessLocked||P.TaskManager.IsBusy||AutoGCHandin.Operation||IPC.Suppressed)return false;
+        if(storageSchedulerOwner==cid)
+        {
+            if(PolicyStorageRouting.OwnsCompletedRun(cid,storageSchedulerOwner,storageSchedulerRevision,SchedulerMain.EnableRevision,SchedulerMain.PluginEnabled))
+                SchedulerMain.DisablePlugin();
+            storageSchedulerOwner=0;
+        }
+        Svc.Log.Information("Steward storage handoff completed; only the captured scheduler run may be disabled");
+        return true;
+    }
     private static unsafe bool? CloseBellForCollection(ulong cid)
     {
         if(!Connected(cid)||HasFault)return null;
         if(TryGetAddonByName<FFXIVClientStructs.FFXIV.Component.GUI.AtkUnitBase>("RetainerList",out var list)&&list->IsVisible)
         {
+            if(SchedulerMain.PluginEnabled&&(storageSchedulerOwner!=cid||storageSchedulerRevision!=SchedulerMain.EnableRevision))
+            {storageSchedulerOwner=cid;storageSchedulerRevision=SchedulerMain.EnableRevision;}
             RetainerListHandlers.CloseRetainerList();
             return false; // Wait for the actual close before AutoRetainer approaches storage.
         }

@@ -49,3 +49,11 @@ class StorageAuthority(unittest.TestCase):
             self.assertIn(gate,storage)
         self.assertIn('if(entrustOnly)TaskEntrustDuplicates.EnqueueNew(plan!);',storage)
         self.assertIn('else TaskPostprocessRetainerIPC.Enqueue(name,"Steward");',storage)
+
+    def test_finish_requires_idle_owned_handoff_and_never_changes_preferences(self):
+        text=(ROOT/'Modules/CompanionStorage.cs').read_text().split('private static bool FinishStorage')[1].split('private static unsafe bool? CloseBellForCollection')[0]
+        for gate in ['!Connected(cid)','HasFault','ledger.Pending.Contains(cid)','ControlActive','RetainerPostProcessLocked','P.TaskManager.IsBusy','AutoGCHandin.Operation','IPC.Suppressed']:
+            self.assertIn(gate,text)
+        self.assertIn('PolicyStorageRouting.OwnsCompletedRun',text)
+        self.assertNotIn('TaskCompletedBehavior',text)
+        self.assertNotIn('IPC.Suppressed=',text)

@@ -1,3 +1,7 @@
+## 4.6.3.27
+
+Acknowledge completion of the scheduler run captured when Steward closes the bell for collection. Finish only the same character and enable revision, after all tasks, transactions and control leases are clear. Never stop a newly enabled run or clear another plugin suppression; preserve configured completion preferences and venture waiting.
+
 ## 4.6.3.26
 
 Add a companion-requested entrust-only follow-up using existing native plans and the existing entrust executor. Skip manual-item retainers and manual/unassigned plans. Do not run disposal, market, ventures or collection postprocessing in this pass; retain final per-slot protections.

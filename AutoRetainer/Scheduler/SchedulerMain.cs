@@ -14,6 +14,7 @@ namespace AutoRetainer.Scheduler;
 internal static unsafe class SchedulerMain
 {
     internal static bool PluginEnabledInternal;
+    internal static long EnableRevision { get; private set; }
     internal static bool PluginEnabled
     {
         get
@@ -23,6 +24,7 @@ internal static unsafe class SchedulerMain
         private set
         {
             PluginEnabledInternal = value;
+            EnableRevision++;
         }
     }
 

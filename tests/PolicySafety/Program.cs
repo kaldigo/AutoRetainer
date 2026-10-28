@@ -3,6 +3,11 @@ using AutoRetainer.Modules;
 var pending=new PolicyConfirmation(12,42,"Inventory1/0/42/1/None",1000);
 var total=0;
 void Check(bool result,string name){total++;if(!result)throw new Exception(name);}
+Check(PolicyStorageRouting.OwnsCompletedRun(12,12,4,4,true),"Finish only the scheduler run captured at dresser departure");
+Check(!PolicyStorageRouting.OwnsCompletedRun(12,13,4,4,true),"Never stop another character's run");
+Check(!PolicyStorageRouting.OwnsCompletedRun(12,12,4,5,true),"Never stop a run enabled again after capture");
+Check(!PolicyStorageRouting.OwnsCompletedRun(12,12,4,4,false),"Do not enable or change an already stopped run");
+Check(!PolicyStorageRouting.OwnsCompletedRun(0,0,0,0,true),"Missing ownership cannot finish a scheduler run");
 {
     void ToReview(PolicyCleanupCycle c,uint withdrawn,uint disposed)
     {
