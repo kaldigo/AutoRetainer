@@ -36,7 +36,7 @@ class StorageBoundary(unittest.TestCase):
   self.assertIn('slot->ItemId==pendingStorageItem&&slot->Quantity==pendingStorageQuantity',text)
  def test_manual_items_role_preserves_ventures_and_excludes_ordinary_item_work(self):
   text=(ROOT/'Scheduler/SchedulerMain.cs').read_text()
-  branch=text.split('if(manualItems&&!VentureDue(ret,adata))')[1].split('VentureOverride = 0')[0]
+  branch=text.split('if(manualItems&&!VentureDue(ret,adata))')[1].split('EnqueueVenture(ret, adata, allowDiscard: true)')[0]
   self.assertIn('TaskWithdrawGil.Enqueue(100)',branch)
   self.assertIn('return;',branch)
   self.assertIn('TaskPostprocessRetainerIPC.Enqueue(retainer,"Steward")',branch)

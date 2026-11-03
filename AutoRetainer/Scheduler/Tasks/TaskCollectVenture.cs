@@ -4,10 +4,10 @@ namespace AutoRetainer.Scheduler.Tasks;
 
 internal static class TaskCollectVenture
 {
-    internal static void Enqueue()
+    internal static void Enqueue(bool allowDiscard = true)
     {
         P.TaskManager.Enqueue(NewYesAlreadyManager.WaitForYesAlreadyDisabledTask);
-        TaskRecursiveItemDiscard.EnqueueIfNeeded();
+        if(allowDiscard) TaskRecursiveItemDiscard.EnqueueIfNeeded();
         if(C.RetainerMenuDelay > 0)
         {
             TaskWaitSelectString.Enqueue(C.RetainerMenuDelay);
@@ -15,6 +15,6 @@ internal static class TaskCollectVenture
         P.TaskManager.Enqueue(RetainerHandlers.SelectViewVentureReport);
         P.TaskManager.Enqueue(() => RetainerHandlers.EnforceSelectString(RetainerHandlers.SelectViewVentureReport), "EnforceSelectString/SelectViewVentureReport");
         P.TaskManager.Enqueue(RetainerHandlers.ClickResultConfirm);
-        TaskRecursiveItemDiscard.EnqueueIfNeeded();
+        if(allowDiscard) TaskRecursiveItemDiscard.EnqueueIfNeeded();
     }
 }

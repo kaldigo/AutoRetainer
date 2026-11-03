@@ -100,86 +100,7 @@ internal static unsafe class SchedulerMain
                                         TaskVendorItems.Enqueue();
                                     }
 
-                                    VentureOverride = 0;
-
-                                    IPC.FireSendRetainerToVentureEvent(retainer);
-
-                                    if(VentureOverride > 0)
-                                    {
-                                        DebugLog($"Using VentureOverride = {VentureOverride}");
-                                        ret.ProcessVenturePlanner(VentureOverride);
-                                    }
-                                    else if(!adata.IsVenturePlannerActive())
-                                    {
-                                        //resend retainer
-
-                                        if(ret.VentureID != 0)
-                                        {
-                                            if(C.DontReassign || Utils.GetVenturesAmount() < 2)
-                                            {
-                                                TaskCollectVenture.Enqueue();
-                                            }
-                                            else
-                                            {
-                                                TaskReassignVenture.Enqueue();
-                                            }
-                                        }
-                                        else
-                                        {
-                                            if(CanAssignQuickExploration)
-                                            {
-                                                TaskAssignQuickVenture.Enqueue();
-                                            }
-                                        }
-                                    }
-                                    else
-                                    {
-                                        var next = adata.GetNextPlannedVenture();
-                                        DebugLog($"Next planned venture: {next}, current venture: {ret.VentureID}");
-                                        var completed = adata.IsLastPlannedVenture();
-                                        DebugLog($"Is last planned venture: {completed}");
-                                        if(next == 0)
-                                        {
-                                            var t = ($"Next venture ID is zero, planner is to be disabled");
-                                            if(!completed)
-                                            {
-                                                DuoLog.Warning(t);
-                                            }
-                                            else
-                                            {
-                                                DebugLog(t);
-                                            }
-                                        }
-                                        if(next == 0 || (completed && adata.VenturePlan.PlanCompleteBehavior != PlanCompleteBehavior.Restart_plan))
-                                        {
-                                            DebugLog($"Completed and behavior is {adata.VenturePlan.PlanCompleteBehavior}");
-                                            if(adata.VenturePlan.PlanCompleteBehavior == PlanCompleteBehavior.Repeat_last_venture)
-                                            {
-                                                DebugLog($"Reassigning this venture and disabling planner");
-                                                TaskReassignVenture.Enqueue();
-                                            }
-                                            else
-                                            {
-                                                TaskCollectVenture.Enqueue();
-                                                if(adata.VenturePlan.PlanCompleteBehavior == PlanCompleteBehavior.Assign_Quick_Venture)
-                                                {
-                                                    DebugLog($"Assigning quick venture");
-                                                    TaskAssignQuickVenture.Enqueue();
-                                                }
-                                            }
-                                            adata.EnablePlanner = false;
-                                            DebugLog($"Now disabling planner");
-                                        }
-                                        else
-                                        {
-                                            ret.ProcessVenturePlanner(next);
-                                        }
-                                        if(completed)
-                                        {
-                                            adata.VenturePlanIndex = 0;
-                                        }
-                                        adata.VenturePlanIndex++;
-                                    }
+                                    EnqueueVenture(ret, adata, allowDiscard: true);
 
                                     var selectedPlan = C.EntrustPlans.FirstOrDefault(x => x.Guid == adata.EntrustPlan && !x.ManualPlan);
                                     if(!manualItems&&C.EnableEntrustManager && selectedPlan != null)
@@ -341,6 +262,131 @@ internal static unsafe class SchedulerMain
                 }
             }
         }
+    }
+
+    private static void EnqueueVenture(GameRetainerManager.Retainer ret, AdditionalRetainerData adata, bool allowDiscard)
+    {
+        var retainer = ret.Name;
+        VentureOverride = 0;
+
+        IPC.FireSendRetainerToVentureEvent(retainer);
+
+        if(VentureOverride > 0)
+        {
+            DebugLog($"Using VentureOverride = {VentureOverride}");
+            ret.ProcessVenturePlanner(VentureOverride, allowDiscard);
+        }
+        else if(!adata.IsVenturePlannerActive())
+        {
+            //resend retainer
+
+            if(ret.VentureID != 0)
+            {
+                if(C.DontReassign || Utils.GetVenturesAmount() < 2)
+                {
+                    TaskCollectVenture.Enqueue(allowDiscard);
+                }
+                else
+                {
+                    TaskReassignVenture.Enqueue(allowDiscard);
+                }
+            }
+            else
+            {
+                if(CanAssignQuickExploration)
+                {
+                    TaskAssignQuickVenture.Enqueue();
+                }
+            }
+        }
+        else
+        {
+            var next = adata.GetNextPlannedVenture();
+            DebugLog($"Next planned venture: {next}, current venture: {ret.VentureID}");
+            var completed = adata.IsLastPlannedVenture();
+            DebugLog($"Is last planned venture: {completed}");
+            if(next == 0)
+            {
+                var t = ($"Next venture ID is zero, planner is to be disabled");
+                if(!completed)
+                {
+                    DuoLog.Warning(t);
+                }
+                else
+                {
+                    DebugLog(t);
+                }
+            }
+            if(next == 0 || (completed && adata.VenturePlan.PlanCompleteBehavior != PlanCompleteBehavior.Restart_plan))
+            {
+                DebugLog($"Completed and behavior is {adata.VenturePlan.PlanCompleteBehavior}");
+                if(adata.VenturePlan.PlanCompleteBehavior == PlanCompleteBehavior.Repeat_last_venture)
+                {
+                    DebugLog($"Reassigning this venture and disabling planner");
+                    TaskReassignVenture.Enqueue(allowDiscard);
+                }
+                else
+                {
+                    TaskCollectVenture.Enqueue(allowDiscard);
+                    if(adata.VenturePlan.PlanCompleteBehavior == PlanCompleteBehavior.Assign_Quick_Venture)
+                    {
+                        DebugLog($"Assigning quick venture");
+                        TaskAssignQuickVenture.Enqueue();
+                    }
+                }
+                adata.EnablePlanner = false;
+                DebugLog($"Now disabling planner");
+            }
+            else
+            {
+                ret.ProcessVenturePlanner(next, allowDiscard);
+            }
+            if(completed)
+            {
+                adata.VenturePlanIndex = 0;
+            }
+            adata.VenturePlanIndex++;
+        }
+    }
+
+    internal static bool ManualVentureControlAvailable =>
+        !PluginEnabledInternal && !IPC.Suppressed && !Utils.MultiModeOrArtisan &&
+        !RetainerPostProcessLocked && !CharacterPostProcessLocked && !Modules.CompanionPolicy.ControlActive && !Modules.CompanionPolicy.SubmissionPending;
+
+    internal static void StartQuickVentures()
+    {
+        if(!ManualVentureControlAvailable || Utils.IsBusy || !GameRetainerManager.Ready) return;
+        var character = Svc.ClientState.LocalContentId;
+        var visited = new HashSet<ulong>();
+        bool? VisitNext()
+        {
+            if(!ManualVentureControlAvailable || Svc.ClientState.LocalContentId != character ||
+                !Svc.Condition[Dalamud.Game.ClientState.Conditions.ConditionFlag.OccupiedSummoningBell]) return true;
+            if(!GameRetainerManager.Ready || !TryGetAddonByName<AtkUnitBase>("RetainerList", out var list) ||
+                !list->IsVisible || !IsAddonReady(list)) return false;
+            if(!Utils.IsInventoryFree() || Utils.GetInventoryFreeSlotCount() == 0)
+            {
+                Notify.Warning("Quick Ventures stopped because there is too little free inventory space.");
+                return true;
+            }
+            foreach(var ret in GameRetainerManager.Retainers)
+            {
+                if(!ret.Available || ret.ClassJob == 0 || visited.Contains(ret.RetainerID) ||
+                    !P.GetSelectedRetainers(character).Contains(ret.Name)) continue;
+                var data = Utils.GetAdditionalData(character, ret.Name);
+                if(!VentureDue(ret, data)) continue;
+                if(RetainerListHandlers.SelectRetainerByName(ret.Name) != true) return false;
+                visited.Add(ret.RetainerID);
+                EnqueueVenture(ret, data, allowDiscard: false);
+                if(C.RetainerMenuDelay > 0) TaskWaitSelectString.Enqueue(C.RetainerMenuDelay);
+                P.TaskManager.Enqueue(RetainerHandlers.SelectQuit);
+                P.TaskManager.Enqueue(VisitNext, "Quick Ventures: next retainer");
+                return true;
+            }
+            if(visited.Count == 0) Notify.Info("No selected retainers have a venture ready to collect or assign.");
+            return true;
+        }
+        P.TaskManager.Enqueue(VisitNext, "Quick Ventures");
     }
 
     private static bool VentureDue(OfflineRetainerData ret,AdditionalRetainerData data)

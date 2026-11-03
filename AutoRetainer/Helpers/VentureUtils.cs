@@ -63,7 +63,7 @@ internal static unsafe class VentureUtils
         }
     }
 
-    internal static void ProcessVenturePlanner(this GameRetainerManager.Retainer ret, uint next)
+    internal static void ProcessVenturePlanner(this GameRetainerManager.Retainer ret, uint next, bool allowDiscard = true)
     {
         if(next != 0)
         {
@@ -81,12 +81,12 @@ internal static unsafe class VentureUtils
             if(next == ret.VentureID)
             {
                 DebugLog($"Reassigning");
-                TaskReassignVenture.Enqueue();
+                TaskReassignVenture.Enqueue(allowDiscard);
             }
             else
             {
                 DebugLog($"Collecting");
-                TaskCollectVenture.Enqueue();
+                TaskCollectVenture.Enqueue(allowDiscard);
                 if(VentureUtils.GetVentureById(next).IsFieldExploration())
                 {
                     DebugLog($"Assigning field exploration: {next}");

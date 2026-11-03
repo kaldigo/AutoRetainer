@@ -4,6 +4,20 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1] / 'AutoRetainer'
 
 class Standalone(unittest.TestCase):
+    def test_manual_ventures_keep_discard_and_full_scheduler_out_of_the_pass(self):
+        scheduler = (ROOT/'Scheduler/SchedulerMain.cs').read_text(encoding='utf-8')
+        manual = scheduler.split('internal static void StartQuickVentures()')[1].split('private static bool VentureDue')[0]
+        self.assertIn('EnqueueVenture(ret, data, allowDiscard: false)', manual)
+        self.assertIn('P.GetSelectedRetainers(character).Contains(ret.Name)', manual)
+        self.assertIn('visited.Add(ret.RetainerID)', manual)
+        for action in ('EnablePlugin(', 'TaskPostprocess', 'TaskEntrust', 'TaskVendor', 'TaskWithdrawGil'):
+            self.assertNotIn(action, manual)
+        for task in ('Collect', 'Reassign'):
+            source = (ROOT/f'Scheduler/Tasks/Task{task}Venture.cs').read_text(encoding='utf-8')
+            for line in source.splitlines():
+                if 'TaskRecursiveItemDiscard.' in line:
+                    self.assertIn('if(allowDiscard)', line)
+
     def test_missing_registration_heartbeat_and_callback_share_safe_fallback(self):
         policy = (ROOT/'Modules/CompanionPolicy.cs').read_text(encoding='utf-8')
         body = policy.split('internal static unsafe bool Allows(')[1].split('internal static unsafe bool AllowsSlot')[0]
@@ -39,7 +53,7 @@ class Standalone(unittest.TestCase):
         self.assertEqual(scheduler.count('if(!manualItems&&Data.GetIMSettings().IMEnableAutoVendor)'), 2)
         self.assertIn('if(!manualItems)TaskPostprocessRetainerIPC.Enqueue(retainer);', scheduler)
         self.assertIn('Modules.PolicyStandalone.VisitManualRetainer', scheduler)
-        self.assertIn('TaskReassignVenture.Enqueue();', scheduler)
+        self.assertIn('TaskReassignVenture.Enqueue(allowDiscard);', scheduler)
         wait=(ROOT/'Helpers/Utils.cs').read_text(encoding='utf-8').split('internal static bool IsAllCurrentCharacterRetainersHaveMoreThan5Mins()')[1].split('internal static string GetActivePlayerInventoryName')[0]
         self.assertIn('PolicyStandalone.FinishesSoon', wait)
         self.assertNotIn('CompanionGilOnlyRetainers', wait)

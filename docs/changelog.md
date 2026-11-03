@@ -1,3 +1,7 @@
+## 4.6.3.28
+
+Quick Ventures beside Quick Entrust collects and assigns ventures once for the selected retainers using their existing venture settings. For manual bell visits, set both bell access actions under Advanced / Expert Settings to Disable AutoRetainer. Use Enable AutoRetainer at the bell for a full run.
+
 ## 4.6.3.27
 
 Acknowledge completion of the scheduler run captured when Steward closes the bell for collection. Finish only the same character and enable revision, after all tasks, transactions and control leases are clear. Never stop a newly enabled run or clear another plugin suppression; preserve configured completion preferences and venture waiting.
