@@ -38,7 +38,7 @@ class Standalone(unittest.TestCase):
         gc = (ROOT/'Modules/GcHandin/AutoGCHandin.cs').read_text(encoding='utf-8')
         self.assertIn('if(!CompanionPolicy.CompanionAvailable)return false;', gc)
         self.assertNotIn('if(!CompanionPolicy.IsManaged)return true;', gc)
-        for file,entry in [('CabinetManager.cs','public void EnqueueGoToInnAndDeliverEverything()'),('MirageManager.cs','public void EnqueueGoToInnAndDeliverEverything(bool leaveOpen)')]:
+        for file,entry in [('CabinetManager.cs','public void EnqueueGoToInnAndDeliverEverything()'),('MirageManager.cs','internal void EnqueueGoToInnAndDeliverEverything(bool leaveOpen, bool openOnly)')]:
             source=(ROOT/'Services'/file).read_text(encoding='utf-8').split(entry)[1]
             self.assertIn('if(!CompanionPolicy.CompanionAvailable)return;', source[:170])
         post=(ROOT/'Scheduler/Tasks/TaskPostprocessRetainerIPC.cs').read_text(encoding='utf-8')

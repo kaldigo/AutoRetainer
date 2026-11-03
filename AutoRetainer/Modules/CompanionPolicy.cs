@@ -46,6 +46,7 @@ internal static partial class CompanionPolicy
         Svc.Framework.Update+=Tick;
         Svc.PluginInterface.GetIpcProvider<int>("AutoRetainer.InventoryPolicy.StorageVersion").RegisterFunc(()=>5);
         Svc.PluginInterface.GetIpcProvider<ulong,bool>("AutoRetainer.InventoryPolicy.FinishStorage").RegisterFunc(FinishStorage);
+        Svc.PluginInterface.GetIpcProvider<ulong,string,bool>("AutoRetainer.InventoryPolicy.ManualBell").RegisterFunc(ManualBell);
         Svc.PluginInterface.GetIpcProvider<ulong,ulong,bool>("AutoRetainer.InventoryPolicy.MigrateStorageRouting").RegisterFunc(MigrateStorageRouting);
         Svc.PluginInterface.GetIpcProvider<ulong,string,bool>("AutoRetainer.InventoryPolicy.StoragePlanAllows").RegisterFunc(StoragePlanAllows);
         Svc.PluginInterface.GetIpcProvider<int>("AutoRetainer.InventoryPolicy.Version").RegisterFunc(() => Version);
@@ -284,6 +285,7 @@ internal static partial class CompanionPolicy
             case "Collect": return EnqueueOverflow(cid,true);
             case "Armoire": return EnqueueCollectionVisit(cid,true);
             case "Dresser": return EnqueueCollectionVisit(cid,false);
+            case "InspectDresser": return EnqueueCollectionVisit(cid,false,openOnly:true);
             case "Vendor": Scheduler.Tasks.TaskVendorItems.EnqueueFromCommand(); return true;
             case "Desynth": if(!Data.GetIMSettings().IMEnableItemDesynthesis) return false; Scheduler.Tasks.TaskDesynthItems.Enqueue(); return true;
             case "Gc": return Scheduler.Tasks.TaskDeliverItems.Enqueue();
@@ -367,6 +369,7 @@ internal static partial class CompanionPolicy
         if(handoffCharacter!=0){handoffCharacter=0;SchedulerMain.RetainerPostProcessLocked=false;}
         Svc.PluginInterface.GetIpcProvider<int>("AutoRetainer.InventoryPolicy.StorageVersion").UnregisterFunc();
         Svc.PluginInterface.GetIpcProvider<ulong,bool>("AutoRetainer.InventoryPolicy.FinishStorage").UnregisterFunc();
+        Svc.PluginInterface.GetIpcProvider<ulong,string,bool>("AutoRetainer.InventoryPolicy.ManualBell").UnregisterFunc();
         storageSchedulerOwner=0;
         Svc.PluginInterface.GetIpcProvider<ulong,ulong,bool>("AutoRetainer.InventoryPolicy.MigrateStorageRouting").UnregisterFunc();
         Svc.PluginInterface.GetIpcProvider<ulong,string,bool>("AutoRetainer.InventoryPolicy.StoragePlanAllows").UnregisterFunc();

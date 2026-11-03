@@ -1,3 +1,7 @@
+## 4.6.3.29
+
+Support the Steward manual bell controls. Check that the bell and scheduler are idle, close the list on request, and verify the interaction has ended before starting separate storage or disposal work. The inspection route opens the dresser for cleanup without entrusting outfits.
+
 ## 4.6.3.28
 
 Quick Ventures beside Quick Entrust collects and assigns ventures once for the selected retainers using their existing venture settings. For manual bell visits, set both bell access actions under Advanced / Expert Settings to Disable AutoRetainer. Use Enable AutoRetainer at the bell for a full run.

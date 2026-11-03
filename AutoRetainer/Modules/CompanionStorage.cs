@@ -35,7 +35,19 @@ internal static partial class CompanionPolicy
         return !Svc.Condition[Dalamud.Game.ClientState.Conditions.ConditionFlag.OccupiedSummoningBell];
     }
 
-    private static bool EnqueueCollectionVisit(ulong cid,bool armoire)
+    private static unsafe bool ManualBell(ulong cid, string stage)
+    {
+        if(!Connected(cid) || HasFault || ledger.Pending.Contains(cid) || CleanupActive || Utils.IsBusy ||
+            !SchedulerMain.ManualVentureControlAvailable || P.WasEnabled) return false;
+        var atBell = Svc.Condition[Dalamud.Game.ClientState.Conditions.ConditionFlag.OccupiedSummoningBell];
+        if(stage == "Released") return !atBell && !IsOccupied();
+        if(!atBell || !TryGetAddonByName<FFXIVClientStructs.FFXIV.Component.GUI.AtkUnitBase>("RetainerList", out var list) ||
+            !list->IsVisible || !IsAddonReady(list)) return false;
+        if(stage == "Available") return true;
+        return stage == "Close" && RetainerListHandlers.CloseRetainerList() == true;
+    }
+
+    private static bool EnqueueCollectionVisit(ulong cid,bool armoire,bool openOnly=false)
     {
         P.TaskManager.Enqueue(()=>CloseBellForCollection(cid),"Close bell before collection storage");
         P.TaskManager.Enqueue(() =>
@@ -44,6 +56,7 @@ internal static partial class CompanionPolicy
             // The upstream route inserts inn travel at the front of the queue. Construct it only after the bell has closed.
             Svc.Log.Information("Steward collection route: opening {Storage}",armoire?"armoire":"glamour dresser");
             if(armoire)S.CabinetManager.EnqueueGoToInnAndDeliverEverything();
+            else if(openOnly) S.MirageManager.EnqueueGoToInnAndDeliverEverything(true, openOnly:true);
             else S.MirageManager.EnqueueGoToInnAndDeliverEverything(true);
         },"Start collection route after closing bell");
         return true;

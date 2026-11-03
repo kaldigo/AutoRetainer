@@ -45,6 +45,9 @@ public unsafe class MirageManager
         => EnqueueGoToInnAndDeliverEverything(false);
 
     public void EnqueueGoToInnAndDeliverEverything(bool leaveOpen)
+        => EnqueueGoToInnAndDeliverEverything(leaveOpen, openOnly:false);
+
+    internal void EnqueueGoToInnAndDeliverEverything(bool leaveOpen, bool openOnly)
     {
         if(!CompanionPolicy.CompanionAvailable)return;
         P.TaskManager.EnqueueTask(NeoTasks.ApproachObjectViaAutomove(GetDresser, 4.4f));
@@ -57,7 +60,7 @@ public unsafe class MirageManager
         });
         P.TaskManager.Enqueue(() =>
         {
-            if(GlamourLog.Available && CompanionPolicy.AllowsDresserBatch()) GlamourLog.EntrustAll();
+            if(!openOnly && GlamourLog.Available && CompanionPolicy.AllowsDresserBatch()) GlamourLog.EntrustAll();
             EzThrottler.Throttle("GlamLogBusy", 1000, true);
         });
         P.TaskManager.EnqueueDelay(1000);
