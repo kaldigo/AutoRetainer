@@ -125,9 +125,9 @@ internal unsafe class RetainerListOverlay : Window
 
             ImGui.SameLine();
             ImGui.BeginDisabled(!SchedulerMain.ManualVentureControlAvailable);
-            if(ImGui.Button("Quick Ventures")) SchedulerMain.StartQuickVentures();
+            if(ImGuiEx.IconButton($"{FontAwesomeIcon.Running.ToIconString()}##QuickVentures")) SchedulerMain.StartQuickVentures();
             ImGui.EndDisabled();
-            ImGuiEx.Tooltip("Collect and assign ready ventures once for your selected retainers, using their venture plans.");
+            ImGuiEx.Tooltip("Quick Ventures: collect and assign ready ventures once for your selected retainers, using their venture plans.");
 
             ImGui.SameLine();
             if(ImGuiEx.IconButton($"{FontAwesomeIcon.ArrowRightToBracket.ToIconString()}##EntrustManually"))

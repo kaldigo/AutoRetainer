@@ -1,3 +1,7 @@
+## 4.6.3.30
+
+Use compact icon buttons for the new manual bell actions, with hover tooltips matching the existing retainer toolbar.
+
 ## 4.6.3.29
 
 Support the Steward manual bell controls. Check that the bell and scheduler are idle, close the list on request, and verify the interaction has ended before starting separate storage or disposal work. The inspection route opens the dresser for cleanup without entrusting outfits.
