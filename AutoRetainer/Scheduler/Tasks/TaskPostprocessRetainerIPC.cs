@@ -2,9 +2,27 @@
 
 internal static class TaskPostprocessRetainerIPC
 {
-    internal static void Enqueue(string retainer, string pluginToProcess = null)
+    internal static void Enqueue(string retainer, string pluginToProcess = null, string marketAction = null)
     {
         if(!Modules.CompanionPolicy.CompanionAvailable)return; // Standalone visits run native ventures/entrust only.
+        if(marketAction != null)
+        {
+            P.TaskManager.Enqueue(() =>
+            {
+                if(!Modules.CompanionPolicy.CompanionAvailable) return;
+                Modules.CompanionPolicy.BeginHandoff("Steward");
+                SchedulerMain.RetainerPostProcessLocked = true;
+                try
+                {
+                    if(Svc.PluginInterface.GetIpcSubscriber<string,string,bool>("Steward.Bell.Market").InvokeFunc(marketAction,retainer)) return;
+                }
+                catch(Exception ex) { ex.Log(); }
+                Modules.CompanionPolicy.EndHandoff();
+                SchedulerMain.RetainerPostProcessLocked = false;
+            }, "Start Steward market visit");
+            P.TaskManager.Enqueue(() => !SchedulerMain.RetainerPostProcessLocked, "Wait for Steward market visit", new(timeLimitMS: int.MaxValue));
+            return;
+        }
         P.TaskManager.Enqueue(() =>
         {
             if(!Modules.CompanionPolicy.CompanionAvailable)return;

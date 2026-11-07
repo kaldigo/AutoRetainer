@@ -1,3 +1,7 @@
+## 4.6.3.31
+
+The bell toolbar groups quick actions under Ventures, Storage, Market, Glamour and Disposal. Use the arrow beside each icon for options. Market, glamour and scoped disposal require the updated Steward companion.
+
 ## 4.6.3.30
 
 Use compact icon buttons for the new manual bell actions, with hover tooltips matching the existing retainer toolbar.

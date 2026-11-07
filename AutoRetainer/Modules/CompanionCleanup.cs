@@ -29,20 +29,33 @@ internal static partial class CompanionPolicy
         try{return Svc.PluginInterface.GetIpcSubscriber<ulong,ulong,bool>("Steward.InventoryPolicy.CleanupRetainerAllowed").InvokeFunc(cid,retainer);}
         catch{return false;}
     }
-    private static bool StartCleanup(ulong cid)
+    private static string cleanupMethod="All";
+    private static bool cleanupCarried;
+    private static bool MethodInScope(string method)=>!cleanup.Active||cleanupMethod=="All"||method==cleanupMethod;
+    internal static bool MethodEnabled(string method) => method switch
+    {
+        "Gc"=>Data.GCDeliveryType!=AutoRetainerAPI.Configuration.GCDeliveryType.Disabled,
+        "Desynth"=>Data.GetIMSettings().IMEnableItemDesynthesis,
+        "Vendor"=>Data.GetIMSettings().IMEnableAutoVendor||Data.GetIMSettings().IMEnableNpcSell,
+        "All"=>MethodEnabled("Gc")||MethodEnabled("Desynth")||MethodEnabled("Vendor"),
+        _=>false
+    };
+    private static bool StartCleanup(ulong cid)=>StartScopedCleanup(cid,"RetainersAll");
+    private static bool StartScopedCleanup(ulong cid,string scope)
     {
         if(cleanup.Active)return false;
         bool Decline(string reason){cleanup.Stop(reason);return false;}
+        var carried=scope.StartsWith("Carried",StringComparison.Ordinal);
+        if(!carried&&!scope.StartsWith("Retainers",StringComparison.Ordinal))return Decline("Unknown inventory scope");
+        var method=scope[(carried?7:9)..];
+        if(!MethodEnabled(method))return Decline("Requested disposal method disabled");
         if(!CleanupAllowed(cid))return Decline("Enable Steward disposal/automation, turn off Demo mode and resolve any review hold");
         if(Utils.IsBusy||SchedulerMain.PluginEnabled||MultiMode.Active)return Decline("Wait for or stop AutoRetainer's existing run before starting full cleanup");
         if(IsOccupied())return Decline("Finish the current interaction and close retainer, shop and confirmation windows before starting full cleanup");
         if(!Player.IsInHomeWorld)return Decline("Return to your home world before starting full cleanup");
-        var settings=Data.GetIMSettings();
-        if(Data.GCDeliveryType==AutoRetainerAPI.Configuration.GCDeliveryType.Disabled&&!settings.IMEnableItemDesynthesis&&!settings.IMEnableAutoVendor&&!settings.IMEnableNpcSell)
-            return Decline("Enable at least one disposal method in AutoRetainer");
-        if(Data.GCDeliveryType!=AutoRetainerAPI.Configuration.GCDeliveryType.Disabled&&!Data.GetIsTeleportEnabledForRetainers())
+        if(!carried && (method is "All" or "Gc") && MethodEnabled("Gc") && !Data.GetIsTeleportEnabledForRetainers())
             return Decline("Enable AutoRetainer's retainer teleport/return travel so the GC batch can return to a bell");
-        cleanup.Start(cid);cleanupAwaiting=false;cleanupTaskFinished=false;cleanupIdleSince=0;
+        cleanupMethod=method;cleanupCarried=carried;cleanup.Start(cid);cleanupAwaiting=false;cleanupTaskFinished=false;cleanupIdleSince=0;
         Svc.Log.Information("[Steward cleanup] Started for character {Character}",cid);
         return true;
     }
@@ -100,7 +113,13 @@ internal static partial class CompanionPolicy
         {
             if(OtherDisposalRemaining())
             {EndCleanup("Approved desynthesis or sale items remain; check the enabled method, unlocks and vendor availability",false);return;}
-            cleanup.Review(Utils.GetInventoryFreeSlotCount()>=2,GCContinuation.DoesInventoryHaveDeliverableItem());
+            if(cleanupCarried)
+            {
+                cleanup.Stop(MethodInScope("Gc") && GCContinuation.DoesInventoryHaveDeliverableItem()
+                    ? "GC candidates remain; review eligibility or seal capacity" : "Carried inventory pass finished");
+                return;
+            }
+            cleanup.Review(Utils.GetInventoryFreeSlotCount()>=2,MethodInScope("Gc") && GCContinuation.DoesInventoryHaveDeliverableItem());
             Svc.Log.Information("[Steward cleanup] {Status}",CleanupStatus);
             if(!cleanup.Active)return;
         }
@@ -112,25 +131,27 @@ internal static partial class CompanionPolicy
             {
                 case CleanupPhase.Bell:
                 case CleanupPhase.Return:
+                    if(cleanupCarried && (cleanup.Phase==CleanupPhase.Bell || !MethodInScope("Vendor") || !cleanupGcStarted))break;
                     if(Utils.GetReachableRetainerBell(true)==null&&!TaskTeleportToProperty.EnqueueIfNeededAndPossible(false))
                     {EndCleanup("No bell is reachable and AutoRetainer has no enabled return route",false);return;}
                     break;
                 case CleanupPhase.Withdraw:
+                    if(cleanupCarried)break;
                     if(!EnqueueOverflow(cleanup.Character,disposalOnly:true)){EndCleanup("Could not begin the retainer withdrawal pass",false);return;}
                     break;
                 case CleanupPhase.Gc:
                     cleanupGcStarted=false;cleanupGcFinished=false;
-                    if(GCContinuation.DoesInventoryHaveDeliverableItem())
+                    if(MethodInScope("Gc") && GCContinuation.DoesInventoryHaveDeliverableItem())
                     {
                         if(!TaskDeliverItems.Enqueue()){EndCleanup("AutoRetainer could not begin GC delivery",false);return;}
                         cleanupGcStarted=true;
                     }
                     break;
                 case CleanupPhase.Desynth:
-                    if(Data.GetIMSettings().IMEnableItemDesynthesis)TaskDesynthItems.Enqueue();
+                    if(MethodInScope("Desynth") && Data.GetIMSettings().IMEnableItemDesynthesis)TaskDesynthItems.Enqueue();
                     break;
                 case CleanupPhase.Vendor:
-                    TaskVendorItems.EnqueueFromCommand();
+                    if(MethodInScope("Vendor"))TaskVendorItems.EnqueueFromCommand();
                     break;
             }
             P.TaskManager.Enqueue(()=>{cleanupTaskFinished=true;},"Steward cleanup stage submitted");

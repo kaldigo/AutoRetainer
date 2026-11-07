@@ -7,13 +7,13 @@ namespace AutoRetainer.Scheduler.Tasks;
 public static unsafe class TaskOpenAllCoffers
 {
     static int OpenedCoffers = 0;
-    public static void Enqueue()
+    public static void Enqueue(bool includeDiscard=true)
     {
-        TaskRecursiveItemDiscard.EnqueueIfNeeded();
+        if(includeDiscard) TaskRecursiveItemDiscard.EnqueueIfNeeded();
         OpenedCoffers = 0;
         P.TaskManager.Enqueue(RecursivelyOpenCoffers, new(timeLimitMS: Data.GetIMSettings().MaxCoffersAtOnce * 10 * 1000, abortOnTimeout: false));
         P.TaskManager.Enqueue(() => Utils.AnimationLock == 0);
-        TaskRecursiveItemDiscard.EnqueueIfNeeded();
+        if(includeDiscard) TaskRecursiveItemDiscard.EnqueueIfNeeded();
     }
 
     public static bool? RecursivelyOpenCoffers()

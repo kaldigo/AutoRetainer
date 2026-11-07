@@ -44,16 +44,20 @@ internal unsafe class RetainerListOverlay : Window
         {
             ImGui.BeginDisabled();
         }
-        if(ImGui.Checkbox("Enable AutoRetainer", ref e))
+        var running=e || Utils.IsBusy || Modules.CompanionPolicy.CleanupActive;
+        if(ImGui.Button(running ? "Stop" : "Run all enabled"))
         {
             P.WasEnabled = false;
-            if(e)
+            if(!running)
             {
                 SchedulerMain.EnablePlugin(PluginEnableReason.Manual);
             }
             else
             {
                 SchedulerMain.DisablePlugin();
+                var stop=Svc.PluginInterface.GetIpcSubscriber<object>("Steward.Bell.Stop");
+                if(stop.HasAction)stop.InvokeAction();
+                P.TaskManager.Abort();
             }
         }
         if(disabled)
@@ -88,186 +92,86 @@ internal unsafe class RetainerListOverlay : Window
             Svc.Commands.ProcessCommand("/ays");
         }
         ImGuiEx.Tooltip("Open Plugin Settings");
+        var ready = SchedulerMain.ManualVentureControlAvailable && !Utils.IsBusy && !P.WasEnabled;
+        var nativeReady=ready && !Modules.CompanionPolicy.HasFault && (!Modules.CompanionPolicy.CompanionAvailable || Reason("Native",ready)=="");
+        var nativeReason=Modules.CompanionPolicy.HasFault ? "Resolve the inventory review hold." : !ready ? "Wait for the current run to finish." : "Steward is in log-only mode.";
+        Group("Ventures", FontAwesomeIcon.Running.ToIconString(), nativeReady, SchedulerMain.StartQuickVentures, () =>
+        {
+            if(!nativeReady) ImGui.TextDisabled(nativeReason);
+            if(!Data.GetIMSettings().IMEnableCofferAutoOpen) ImGui.TextDisabled("Enable coffer opening in AutoRetainer.");
+            if(ImGui.MenuItem("Open venture coffers", "", false, nativeReady && Data.GetIMSettings().IMEnableCofferAutoOpen))
+            {
+                P.TaskManager.Enqueue(RetainerListHandlers.CloseRetainerList);
+                P.TaskManager.Enqueue(() => !IsOccupied());
+                TaskOpenAllCoffers.Enqueue(includeDiscard: false);
+            }
+        });
+        Group("Storage", Lang.IconDuplicate, nativeReady, () => Entrust(null, false), () =>
+        {
+            if(!nativeReady) ImGui.TextDisabled(nativeReason);
+            foreach(var reverse in new[]{false, true})
+            {
+                if(!ImGui.BeginMenu(reverse ? "Withdraw using plan" : "Entrust using plan", nativeReady)) continue;
+                foreach(var plan in C.EntrustPlans)
+                    if(ImGui.MenuItem($"{plan.Name}##{plan.Guid}")) Entrust(plan.Guid, reverse);
+                ImGui.EndMenu();
+            }
+            if(ImGui.MenuItem("Withdraw all gil", "", false, nativeReady)) TransferGil(true);
+            if(ImGui.MenuItem("Run configured gil transfers", "", false, nativeReady)) TransferGil(false);
+            StewardEntry("Store protected overflow", "Overflow", ready);
+        });
+        string[] marketModes = ["Market", "Reprice", "List", "Review"];
+        string[] marketLabels = ["Full market pass", "Reprice only", "List only", "Review withdrawals and rotation"];
+        void MarketOptions(ulong retainer)
+        {
+            for(int i=0; i<marketModes.Length; i++)
+                StewardEntry(marketLabels[i], marketModes[i], ready, retainer);
+        }
+        Group("Market", FontAwesomeIcon.Coins.ToIconString(), Available("Market",ready), () => Start("Market"), () =>
+        {
+            MarketOptions(0);
+            if(ImGui.BeginMenu("One retainer"))
+            {
+                foreach(var ret in GameRetainerManager.Retainers)
+                    if(ret.Available && ImGui.BeginMenu(ret.Name))
+                    {
+                        MarketOptions(ret.RetainerID);
+                        ImGui.EndMenu();
+                    }
+                ImGui.EndMenu();
+            }
+        });
+        Group("Glamour", FontAwesomeIcon.Tshirt.ToIconString(), Available("GlamourStorage",ready), () => Start("GlamourStorage"), () =>
+        {
+            StewardEntry("Armoire only", "Armoire", ready);
+            StewardEntry("Clean dresser", "DresserCleanup", ready);
+        });
+        Group("Disposal", FontAwesomeIcon.Recycle.ToIconString(), Available("InventoryDisposal",ready), () => Start("InventoryDisposal"), () =>
+        {
+            foreach(var scope in new[]{"Carried", "Retainers"})
+            {
+                if(!ImGui.BeginMenu(scope=="Carried" ? "Carried inventory only" : "Include retainer withdrawals")) continue;
+                foreach(var method in new[]{"All","Gc","Desynth","Vendor"})
+                    StewardEntry(method=="All" ? "Enabled methods" : method=="Gc" ? "GC only" : method+" only", scope+method, ready);
+                ImGui.EndMenu();
+            }
+            if(ImGui.MenuItem("Quick vendor via retainer", "", false, nativeReady && Available("InventoryDisposal",ready) && Data.GetIMSettings().IMEnableAutoVendor))
+                Utils.EnqueueVendorItemsByRetainer();
+            if(ImGui.MenuItem("Sell quick-venture list", "", false, nativeReady && Available("InventoryDisposal",ready) && Data.GetIMSettings().IMEnableAutoVendor))
+            {
+                foreach(var ret in GameRetainerManager.Retainers)
+                {
+                    if(!ret.Available || C.CompanionGilOnlyRetainers.Contains(ret.RetainerID)) continue;
+                    TaskSelectRetainer.Enqueue(ret.Name);
+                    TaskVendorItems.Enqueue(true);
+                    LeaveRetainer();
+                    P.TaskManager.Enqueue(RetainerHandlers.ConfirmCantBuyback);
+                    break;
+                }
+            }
+        });
         if(!P.TaskManager.IsBusy)
         {
-            ImGui.SameLine();
-            if(ImGuiEx.IconButton($"{Lang.IconDuplicate}##Entrust all duplicates"))
-            {
-                for(var i = 0; i < GameRetainerManager.Count; i++)
-                {
-                    var ret = GameRetainerManager.Retainers[i];
-                    if(ret.Available)
-                    {
-                        var adata = Utils.GetAdditionalData(Data.CID, ret.Name);
-                        var selectedPlan = C.EntrustPlans.FirstOrDefault(x => x.Guid == adata.EntrustPlan);
-                        if(selectedPlan != null)
-                        {
-                            if(selectedPlan.DoesInventoryHaveMatchingItems())
-                            {
-                                P.TaskManager.Enqueue(() => RetainerListHandlers.SelectRetainerByName(ret.Name.ToString()));
-                                TaskEntrustDuplicates.EnqueueNew(selectedPlan);
-                                if(C.RetainerMenuDelay > 0)
-                                {
-                                    TaskWaitSelectString.Enqueue(C.RetainerMenuDelay);
-                                }
-                                P.TaskManager.Enqueue(RetainerHandlers.SelectQuit);
-                            }
-                        }
-                        else
-                        {
-                            Notify.Error($"No entrust plan found for retainer {ret.Name}");
-                        }
-
-                    }
-                }
-            }
-            ImGuiEx.Tooltip("Quick Entrust");
-
-            ImGui.SameLine();
-            ImGui.BeginDisabled(!SchedulerMain.ManualVentureControlAvailable);
-            if(ImGuiEx.IconButton($"{FontAwesomeIcon.Running.ToIconString()}##QuickVentures")) SchedulerMain.StartQuickVentures();
-            ImGui.EndDisabled();
-            ImGuiEx.Tooltip("Quick Ventures: collect and assign ready ventures once for your selected retainers, using their venture plans.");
-
-            ImGui.SameLine();
-            if(ImGuiEx.IconButton($"{FontAwesomeIcon.ArrowRightToBracket.ToIconString()}##EntrustManually"))
-            {
-                ImGui.OpenPopup("EntrustManually");
-            }
-            if(ImGui.BeginPopup("EntrustManually"))
-            {
-                foreach(var selectedPlan in C.EntrustPlans)
-                {
-                    ImGui.PushID(selectedPlan.Guid.ToString());
-                    if(ImGui.Selectable($"{selectedPlan.Name}"))
-                    {
-                        for(var i = 0; i < GameRetainerManager.Count; i++)
-                        {
-                            var ret = GameRetainerManager.Retainers[i];
-                            if(ret.Available)
-                            {
-                                var adata = Utils.GetAdditionalData(Data.CID, ret.Name);
-                                if(selectedPlan != null)
-                                {
-                                    if(selectedPlan.DoesInventoryHaveMatchingItems())
-                                    {
-                                        P.TaskManager.Enqueue(() => RetainerListHandlers.SelectRetainerByName(ret.Name.ToString()));
-                                        TaskEntrustDuplicates.EnqueueNew(selectedPlan);
-                                        if(C.RetainerMenuDelay > 0)
-                                        {
-                                            TaskWaitSelectString.Enqueue(C.RetainerMenuDelay);
-                                        }
-                                        P.TaskManager.Enqueue(RetainerHandlers.SelectQuit);
-                                    }
-                                    else
-                                    {
-                                        Notify.Warning("No items in inventory to entrust");
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    ImGui.PopID();
-                }
-                ImGui.EndPopup();
-            }
-            ImGuiEx.Tooltip("Run a specific entrust plan");
-
-            ImGui.SameLine();
-            if(ImGuiEx.IconButton($"{FontAwesomeIcon.ArrowRightFromBracket.ToIconString()}##ReverseEntrust"))
-            {
-                ImGui.OpenPopup("ReverseEntrust");
-            }
-            if(ImGui.BeginPopup("ReverseEntrust")) 
-            { 
-                foreach(var selectedPlan in C.EntrustPlans)
-                {
-                    ImGui.PushID(selectedPlan.Guid.ToString());
-                    if(ImGui.Selectable($"{selectedPlan.Name}"))
-                    {
-                        for(var i = 0; i < GameRetainerManager.Count; i++)
-                        {
-                            var ret = GameRetainerManager.Retainers[i];
-                            if(ret.Available)
-                            {
-                                var adata = Utils.GetAdditionalData(Data.CID, ret.Name);
-                                if(selectedPlan != null)
-                                {
-                                    P.TaskManager.Enqueue(() => RetainerListHandlers.SelectRetainerByName(ret.Name.ToString()));
-                                    TaskEntrustDuplicates.EnqueueNewReverse(selectedPlan);
-                                    if(C.RetainerMenuDelay > 0)
-                                    {
-                                        TaskWaitSelectString.Enqueue(C.RetainerMenuDelay);
-                                    }
-                                    P.TaskManager.Enqueue(RetainerHandlers.SelectQuit);
-                                }
-                            }
-                        }
-                    }
-                    ImGui.PopID();
-                }
-                ImGui.EndPopup();
-            }
-            ImGuiEx.Tooltip("Reverse run a specific entrust plan (withdraw items according to entrust plan from retainers)");
-
-            ImGui.SameLine();
-            if(ImGuiEx.IconButton($"{Lang.IconGil}##WithdrawGil"))
-            {
-                for(var i = 0; i < GameRetainerManager.Count; i++)
-                {
-                    var ret = GameRetainerManager.Retainers[i];
-                    if(ret.Available)
-                    {
-                        P.TaskManager.Enqueue(() => RetainerListHandlers.SelectRetainerByName(ret.Name.ToString()));
-                        TaskWithdrawGil.Enqueue(100);
-
-                        if(C.RetainerMenuDelay > 0)
-                        {
-                            TaskWaitSelectString.Enqueue(C.RetainerMenuDelay);
-                        }
-                        P.TaskManager.Enqueue(RetainerHandlers.SelectQuit);
-                    }
-                }
-            }
-            ImGuiEx.Tooltip("Quick Withdraw Gil");
-
-            {
-                ImGui.SameLine();
-                if(ImGuiEx.IconButton($"{Lang.IconFire}##vendoritems"))
-                {
-                    Utils.EnqueueVendorItemsByRetainer();
-                }
-                if(ImGui.IsItemClicked(ImGuiMouseButton.Right))
-                {
-                    ImGui.OpenPopup("QuickVendorPopup");
-                }
-                ImGuiEx.Tooltip("Quick Vendor Items");
-                if(ImGui.BeginPopup("QuickVendorPopup"))
-                {
-                    if(ImGui.Selectable("Sell items from Quick Venture List"))
-                    {
-                        for(var i = 0; i < GameRetainerManager.Count; i++)
-                        {
-                            var ret = GameRetainerManager.Retainers[i];
-                            if(ret.Available)
-                            {
-                                P.TaskManager.Enqueue(() => RetainerListHandlers.SelectRetainerByName(ret.Name.ToString()));
-                                TaskVendorItems.Enqueue(true);
-
-                                if(C.RetainerMenuDelay > 0)
-                                {
-                                    TaskWaitSelectString.Enqueue(C.RetainerMenuDelay);
-                                }
-                                P.TaskManager.Enqueue(RetainerHandlers.SelectQuit);
-                                P.TaskManager.Enqueue(RetainerHandlers.ConfirmCantBuyback);
-                                break;
-                            }
-                        }
-                    }
-                    ImGui.EndPopup();
-                }
-            }
-
             PluginToProcess = null;
             Svc.PluginInterface.GetIpcProvider<object>(ApiConsts.OnRetainerListTaskButtonsDraw).SendMessage();
             if(PluginToProcess != null)
@@ -291,6 +195,102 @@ internal unsafe class RetainerListOverlay : Window
             }
         }
         height = ImGui.GetWindowSize().Y;
+    }
+
+    private static void Group(string name, string icon, bool enabled, Action action, Action menu)
+    {
+        ImGui.SameLine();
+        ImGui.PushID(name);
+        ImGui.BeginDisabled(!enabled);
+        if(ImGuiEx.IconButton(icon+"##action")) action();
+        ImGui.EndDisabled();
+        if(ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled)) ImGui.SetTooltip(enabled ? name : name+" unavailable. Open options for details.");
+        ImGui.SameLine();
+        if(ImGui.ArrowButton("options", ImGuiDir.Down)) ImGui.OpenPopup("menu");
+        if(ImGui.BeginPopup("menu"))
+        {
+            menu();
+            ImGui.EndPopup();
+        }
+        ImGui.PopID();
+    }
+
+    private static string Reason(string action, bool ready, ulong retainer=0)
+    {
+        if(!ready) return "Wait for the current run to finish.";
+        if(action.StartsWith("Carried") || action.StartsWith("Retainers") || action=="InventoryDisposal")
+        {
+            var method=action=="InventoryDisposal" ? "All" : action[(action.StartsWith("Carried")?7:9)..];
+            if(Data.GetIMSettings().IMDry) return "AutoRetainer Demo mode is on.";
+            if(!Modules.CompanionPolicy.MethodEnabled(method)) return "Enable this disposal method in AutoRetainer.";
+        }
+        try { return Svc.PluginInterface.GetIpcSubscriber<string,ulong,string>("Steward.Bell.Availability").InvokeFunc(action,retainer); }
+        catch { return "Update and connect Steward."; }
+    }
+    private static bool Available(string action,bool ready) => Reason(action,ready)=="";
+    private static void StewardEntry(string label,string action,bool ready,ulong retainer=0)
+    {
+        var reason=Reason(action,ready,retainer);
+        if(ImGui.MenuItem(label,"",false,reason=="")) Start(action,retainer);
+        if(reason!="" && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled)) ImGui.SetTooltip(reason);
+    }
+    private static void Start(string action,ulong only=0)
+    {
+        if(action is "Market" or "List" or "Reprice" or "Review")
+        {
+            var scope=Reason("LogOnly",true)=="" ? "Preview/"+action : action;
+            var visited=0;
+            foreach(var ret in GameRetainerManager.Retainers)
+            {
+                if(!ret.Available || only!=0 && ret.RetainerID!=only || Reason(action,true,ret.RetainerID)!="") continue;
+                TaskSelectRetainer.Enqueue(ret.Name);
+                visited++;
+                TaskPostprocessRetainerIPC.Enqueue(ret.Name,"Steward",scope);
+                LeaveRetainer();
+            }
+            if(visited==0)Notify.Info("No available retainers match the sale settings for this action.");
+            return;
+        }
+        Svc.PluginInterface.GetIpcSubscriber<string,object>("Steward.Bell.Start").InvokeAction(action);
+    }
+    private static void LeaveRetainer()
+    {
+        if(C.RetainerMenuDelay>0) TaskWaitSelectString.Enqueue(C.RetainerMenuDelay);
+        P.TaskManager.Enqueue(RetainerHandlers.SelectQuit);
+    }
+    private static void Entrust(Guid? planId,bool reverse)
+    {
+        foreach(var ret in GameRetainerManager.Retainers)
+        {
+            if(!ret.Available || C.CompanionGilOnlyRetainers.Contains(ret.RetainerID)) continue;
+            var id=planId??Utils.GetAdditionalData(Data.CID,ret.Name).EntrustPlan;
+            var plan=C.EntrustPlans.FirstOrDefault(x=>x.Guid==id);
+            if(plan==null || !reverse && !plan.DoesInventoryHaveMatchingItems()) continue;
+            TaskSelectRetainer.Enqueue(ret.Name);
+            if(reverse) TaskEntrustDuplicates.EnqueueNewReverse(plan);
+            else TaskEntrustDuplicates.EnqueueNew(plan);
+            LeaveRetainer();
+        }
+    }
+    private static void TransferGil(bool all)
+    {
+        foreach(var ret in GameRetainerManager.Retainers)
+        {
+            if(!ret.Available) continue;
+            var data=Utils.GetAdditionalData(Data.CID,ret.Name);
+            if(!all && !data.WithdrawGil) continue;
+            TaskSelectRetainer.Enqueue(ret.Name);
+            P.TaskManager.Enqueue(() =>
+            {
+                if(!Modules.CompanionPolicy.Allows("Gil",0))return;
+                P.TaskManager.InsertStack(() =>
+                {
+                    if(!all && data.Deposit) TaskDepositGil.Enqueue(data.WithdrawGilPercent);
+                    else TaskWithdrawGil.Enqueue(all ? 100 : data.WithdrawGilPercent);
+                });
+            });
+            LeaveRetainer();
+        }
     }
 
     public override void PostDraw()

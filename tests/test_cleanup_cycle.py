@@ -37,3 +37,13 @@ class CleanupCycleWiring(unittest.TestCase):
   self.assertIn('!cleanup.Active||!CleanupRetainerAllowed(cid,retainerId)',storage)
   self.assertIn('TaskPostprocessRetainerIPC.Enqueue(name,"Steward")',storage)
 
+
+ def test_method_scope_applies_to_withdrawals_and_native_disposal(self):
+  policy=(ROOT/'Modules/CompanionPolicy.cs').read_text()
+  self.assertIn('MethodInScope(action)&&(action!="Vendor"',policy)
+  selection=policy.split('"AutoRetainer.InventoryPolicy.DisposalSelected").RegisterFunc')[1].split(');')[0]
+  for gate in ['MethodInScope("Gc")','DisposalMethodAllows("Vendor",id)','DisposalMethodAllows("Desynth",id)']:
+   self.assertIn(gate,selection)
+  cycle=(ROOT/'Modules/CompanionCleanup.cs').read_text()
+  withdraw=cycle.split('case CleanupPhase.Withdraw:')[1].split('case CleanupPhase.Gc:')[0]
+  self.assertLess(withdraw.index('if(cleanupCarried)break'),withdraw.index('EnqueueOverflow'))

@@ -35,13 +35,14 @@ internal static partial class CompanionPolicy
         ready=true;
         Svc.PluginInterface.GetIpcProvider<int>("AutoRetainer.InventoryPolicy.CleanupVersion").RegisterFunc(()=>1);
         Svc.PluginInterface.GetIpcProvider<ulong,bool>("AutoRetainer.InventoryPolicy.StartCleanup").RegisterFunc(StartCleanup);
+        Svc.PluginInterface.GetIpcProvider<ulong,string,bool>("AutoRetainer.InventoryPolicy.StartScopedCleanup").RegisterFunc(StartScopedCleanup);
         Svc.PluginInterface.GetIpcProvider<ulong,bool>("AutoRetainer.InventoryPolicy.StopCleanup").RegisterFunc(StopCleanup);
         Svc.PluginInterface.GetIpcProvider<ulong,bool>("AutoRetainer.InventoryPolicy.CleanupActive").RegisterFunc(cid=>cleanup.Active&&cleanup.Character==cid);
         Svc.PluginInterface.GetIpcProvider<string>("AutoRetainer.InventoryPolicy.CleanupStatus").RegisterFunc(()=>CleanupStatus);
         Svc.PluginInterface.GetIpcProvider<ulong,ulong,uint,bool>("AutoRetainer.InventoryPolicy.CleanupWithdrawalConfirmed").RegisterFunc(CleanupWithdrawalConfirmed);
         Svc.PluginInterface.GetIpcProvider<uint,uint,bool>("AutoRetainer.InventoryPolicy.DisposalSelected").RegisterFunc((id,quantity)=>
             CompanionAvailable&&!Data.GetIMSettings().IMDry&&Utils.IsItemSelectedByHardList(id,quantity)&&
-            (GcDisposalCandidate(id)||(Data.GetIMSettings().IMEnableAutoVendor||Data.GetIMSettings().IMEnableNpcSell)&&VendorDisposalEligible(id)||DesynthDisposalEligible(id)));
+            (GcDisposalCandidate(id)&&MethodInScope("Gc")||MethodEnabled("Vendor")&&VendorDisposalEligible(id)&&DisposalMethodAllows("Vendor",id)||DesynthDisposalEligible(id)&&DisposalMethodAllows("Desynth",id)));
         Svc.PluginInterface.GetIpcProvider<uint,uint,string>("AutoRetainer.InventoryPolicy.DisposalPreview").RegisterFunc(DisposalPreview);
         Svc.Framework.Update+=Tick;
         Svc.PluginInterface.GetIpcProvider<int>("AutoRetainer.InventoryPolicy.StorageVersion").RegisterFunc(()=>5);
@@ -100,7 +101,7 @@ internal static partial class CompanionPolicy
             item.Value.GetRarity().EqualsAny(ItemRarity.Green,ItemRarity.Pink,ItemRarity.Blue)&&item.Value.Desynth>0;
     }
     private static bool DisposalMethodAllows(string action,uint id)=>action is not ("Gc" or "Desynth" or "Vendor")||
-        (action!="Vendor"||VendorDisposalEligible(id))&&PolicyDisposal.Allows(action,Data.GetIMSettings().IMDry,
+        MethodInScope(action)&&(action!="Vendor"||VendorDisposalEligible(id))&&PolicyDisposal.Allows(action,Data.GetIMSettings().IMDry,
         C.CompanionGcFirstCharacters.Contains(Svc.ClientState.LocalContentId)||cleanup.Active,GcDisposalCandidate(id),
         DesynthDisposalEligible(id));
     private static readonly Dictionary<ulong,long> strategyVisits=[];
@@ -358,6 +359,7 @@ internal static partial class CompanionPolicy
         if(cleanup.Active)EndCleanup("AutoRetainer unloaded",false);
         Svc.PluginInterface.GetIpcProvider<int>("AutoRetainer.InventoryPolicy.CleanupVersion").UnregisterFunc();
         Svc.PluginInterface.GetIpcProvider<ulong,bool>("AutoRetainer.InventoryPolicy.StartCleanup").UnregisterFunc();
+        Svc.PluginInterface.GetIpcProvider<ulong,string,bool>("AutoRetainer.InventoryPolicy.StartScopedCleanup").UnregisterFunc();
         Svc.PluginInterface.GetIpcProvider<ulong,bool>("AutoRetainer.InventoryPolicy.StopCleanup").UnregisterFunc();
         Svc.PluginInterface.GetIpcProvider<ulong,bool>("AutoRetainer.InventoryPolicy.CleanupActive").UnregisterFunc();
         Svc.PluginInterface.GetIpcProvider<string>("AutoRetainer.InventoryPolicy.CleanupStatus").UnregisterFunc();
