@@ -39,7 +39,7 @@ internal static partial class CompanionPolicy
         try{EzConfig.Save();return true;}
         catch{C.CompanionCurrencyRetainers.Remove(cid);throw;}
     }
-    private static bool StorageScopeAllows(ulong cid,ulong retainer,uint id)
+    internal static bool StorageScopeAllows(ulong cid,ulong retainer,uint id)
     {
         var currency=C.CompanionCurrencyRetainers.GetValueOrDefault(cid);
         if(currency==0)return true;

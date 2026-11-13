@@ -716,41 +716,63 @@ public static unsafe class Utils
         AgentInventoryContext.Instance()->DiscardItem(ptr, type, slotIndex, 0);
     }
 
-    public static bool DoesInventoryHaveMatchingItems(this EntrustPlan plan)
+    public static bool DoesInventoryHaveMatchingItems(this EntrustPlan plan,ulong retainer)
     {
-        if(plan.Duplicates) return true;
-        var types = (InventoryType[])([.. Utils.PlayerInvetoriesWithCrystals, .. (plan.AllowEntrustFromArmory ? Utils.PlayerArmory : [])]);
-        foreach(var x in plan.EntrustCategories)
+        var types=plan.GetAllowedInventories();
+        var manager=InventoryManager.Instance();
+        if(manager==null)return true;
+        foreach(var type in types)
         {
-            foreach(var inv in types)
+            var inventory=manager->GetInventoryContainer(type);
+            if(inventory==null||!inventory->IsLoaded)return true;
+        }
+        HashSet<uint> blocked=[];
+        try{blocked=Svc.PluginInterface.GetIpcSubscriber<ulong,ulong,uint[]>("Steward.InventoryPolicy.EntrustBlockedItems").InvokeFunc(Data.CID,retainer).ToHashSet();}
+        catch{} // Native standalone entrusting remains available.
+        uint[] cached=null;
+        if(plan.Duplicates)
+        {
+            try{cached=Svc.PluginInterface.GetIpcSubscriber<ulong,ulong,uint[]>("Steward.InventoryPolicy.CachedBagStacks").InvokeFunc(Data.CID,retainer);}
+            catch{} // Standalone or older Steward: inspect duplicates live.
+        }
+        foreach(var id in GetItemsInInventory(types))
+        {
+            if(blocked.Contains(id)||IsProtected(id)||!global::AutoRetainer.Modules.CompanionPolicy.StorageScopeAllows(Data.CID,retainer,id))continue;
+            if(!Svc.Data.GetExcelSheet<Item>().TryGetRow(id,out var item))return true;
+            var category=plan.EntrustCategories.FirstOrDefault(c=>c.ID==item.ItemUICategory.RowId);
+            if(plan.EntrustItems.Contains(id)||category!=null)
             {
-                var cont = InventoryManager.Instance()->GetInventoryContainer(inv);
-                for(int i = 0; i < cont->Size; i++)
-                {
-                    var item = cont->Items[i];
-                    if(item.ItemId > 0 && item.Quantity > 0 && (!plan.ExcludeProtected || !IsProtected(item.ItemId)) && Svc.Data.GetExcelSheet<Item>().TryGetRow(item.ItemId, out var data))
-                    {
-                        if(data.ItemUICategory.RowId == x.ID)
-                        {
-                            var cnt = Utils.CountItemsInInventory(item.ItemId, null, types);
-                            if(cnt > x.AmountToKeep) 
-                            { 
-                                PluginLog.Debug($"DoesInventoryHaveMatchingItems: Found category: {data.ItemUICategory.ValueNullable?.Name} ({data.ItemUICategory.RowId}) count: {cnt}>{x.AmountToKeep} from item {data.GetName(true)}");
-                                return true;
-                            }
-                        }
-                    }
-                }
+                var keep=plan.EntrustItems.Contains(id)?plan.EntrustItemsAmountToKeep.SafeSelect(id):category.AmountToKeep;
+                if(GetItemCount(types,id)>keep)return true;
+                continue;
+            }
+            if(!plan.Duplicates||item.IsUnique&&!plan.DuplicatesMultiStack)continue;
+            if(cached==null||cached.Length%3!=0)return true;
+            for(int i=0;i<cached.Length;i+=3)
+            {
+                if(cached[i]!=id)continue;
+                if(plan.DuplicatesMultiStack||cached[i+2]<item.StackSize&&CountItemsInInventory(id,cached[i+1]!=0,types)>0)return true;
             }
         }
-        foreach(var x in plan.EntrustItems)
+        return false;
+    }
+
+    public static bool MayWithdrawUsingPlan(this EntrustPlan plan,ulong retainer)
+    {
+        uint[] bags;
+        try{bags=Svc.PluginInterface.GetIpcSubscriber<ulong,ulong,uint[]>("Steward.InventoryPolicy.CachedBagStacks").InvokeFunc(Data.CID,retainer);}
+        catch{return true;}
+        if(bags==null||bags.Length%3!=0)return true;
+        // Retainer crystal storage is separate from the seven cached pages.
+        for(uint id=2;id<=19;id++)
+            if(plan.EntrustItems.Contains(id)||Svc.Data.GetExcelSheet<Item>().TryGetRow(id,out var crystal)&&
+                plan.EntrustCategories.Any(c=>c.ID==crystal.ItemUICategory.RowId))return true;
+        for(int i=0;i<bags.Length;i+=3)
         {
-            var cnt = Utils.CountItemsInInventory(x, null, types);
-            if(cnt > plan.EntrustItemsAmountToKeep.SafeSelect(x))
-            {
-                PluginLog.Debug($"DoesInventoryHaveMatchingItems: Found item: {ExcelItemHelper.GetName(x, true)}, amount {cnt}>{plan.EntrustItemsAmountToKeep.SafeSelect(x)}");
-                return true;
-            }
+            var id=bags[i];
+            if(IsProtected(id))continue;
+            if(plan.Duplicates||plan.EntrustItems.Contains(id))return true;
+            if(!Svc.Data.GetExcelSheet<Item>().TryGetRow(id,out var item)||plan.EntrustCategories.Any(c=>c.ID==item.ItemUICategory.RowId))return true;
         }
         return false;
     }

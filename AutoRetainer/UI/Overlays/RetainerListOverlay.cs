@@ -243,12 +243,20 @@ internal unsafe class RetainerListOverlay : Window
             foreach(var ret in GameRetainerManager.Retainers)
             {
                 if(!ret.Available || only!=0 && ret.RetainerID!=only || Reason(action,true,ret.RetainerID)!="") continue;
-                TaskSelectRetainer.Enqueue(ret.Name);
-                visited++;
-                TaskPostprocessRetainerIPC.Enqueue(ret.Name,"Steward",scope);
-                LeaveRetainer();
+                P.TaskManager.Enqueue(() =>
+                {
+                    if(only==0&&!Modules.CompanionPolicy.VisitNeeded(Data.CID,ret.RetainerID,action,ret.MarkerItemCount))return true;
+                    P.TaskManager.InsertStack(() =>
+                    {
+                        TaskSelectRetainer.Enqueue(ret.Name);
+                        TaskPostprocessRetainerIPC.Enqueue(ret.Name,"Steward",scope);
+                        LeaveRetainer();
+                    });
+                    visited++;
+                    return true;
+                });
             }
-            if(visited==0)Notify.Info("No available retainers match the sale settings for this action.");
+            P.TaskManager.Enqueue((Action)(()=>{if(visited==0)Notify.Info("No retainers need this market action.");}));
             return;
         }
         Svc.PluginInterface.GetIpcSubscriber<string,object>("Steward.Bell.Start").InvokeAction(action);
@@ -265,11 +273,23 @@ internal unsafe class RetainerListOverlay : Window
             if(!ret.Available || C.CompanionGilOnlyRetainers.Contains(ret.RetainerID)) continue;
             var id=planId??Utils.GetAdditionalData(Data.CID,ret.Name).EntrustPlan;
             var plan=C.EntrustPlans.FirstOrDefault(x=>x.Guid==id);
-            if(plan==null || !reverse && !plan.DoesInventoryHaveMatchingItems()) continue;
-            TaskSelectRetainer.Enqueue(ret.Name);
-            if(reverse) TaskEntrustDuplicates.EnqueueNewReverse(plan);
-            else TaskEntrustDuplicates.EnqueueNew(plan);
-            LeaveRetainer();
+            if(plan==null)continue;
+            P.TaskManager.Enqueue(() =>
+            {
+                if(!(reverse?plan.MayWithdrawUsingPlan(ret.RetainerID):plan.DoesInventoryHaveMatchingItems(ret.RetainerID)))
+                {
+                    Svc.Log.Debug("Skipped storage visit to {Retainer}: no matching work for {Plan}",ret.Name,plan.Name);
+                    return true;
+                }
+                P.TaskManager.InsertStack(() =>
+                {
+                    TaskSelectRetainer.Enqueue(ret.Name);
+                    if(reverse) TaskEntrustDuplicates.EnqueueNewReverse(plan);
+                    else TaskEntrustDuplicates.EnqueueNew(plan);
+                    LeaveRetainer();
+                });
+                return true;
+            });
         }
     }
     private static void TransferGil(bool all)
@@ -279,6 +299,7 @@ internal unsafe class RetainerListOverlay : Window
             if(!ret.Available) continue;
             var data=Utils.GetAdditionalData(Data.CID,ret.Name);
             if(!all && !data.WithdrawGil) continue;
+            if((all||!data.Deposit)&&ret.Gil==0)continue;
             TaskSelectRetainer.Enqueue(ret.Name);
             P.TaskManager.Enqueue(() =>
             {

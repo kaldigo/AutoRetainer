@@ -1,3 +1,7 @@
+## Retainer visit planning
+
+Use per-retainer bag observations and current carried stock to skip idle retainer visits. Explicit market inspection remains available.
+
 ## Glamour collection
 
 During a Steward collection sweep, ask about each retainer's inventory before opening that retainer.

@@ -136,14 +136,14 @@ internal static partial class CompanionPolicy
                 if(!Connected(cid)||HasFault)return true;
                 var extra=C.AdditionalData.GetValueOrDefault(Utils.GetAdditionalDataKey(cid,name,false));
                 var plan=C.EntrustPlans.FirstOrDefault(p=>p.Guid==extra?.EntrustPlan&&!p.ManualPlan);
-                if(entrustOnly&&(!C.EnableEntrustManager||plan==null||C.CompanionGilOnlyRetainers.Contains(retainerId)))return true;
+                if(entrustOnly&&(!C.EnableEntrustManager||plan==null||!plan.DoesInventoryHaveMatchingItems(retainerId)||C.CompanionGilOnlyRetainers.Contains(retainerId)))return true;
                 if(disposalOnly)
                 {
                     if(!cleanup.Active||!CleanupRetainerAllowed(cid,retainerId))return true;
                     cleanup.Visited++;
-                    if(Utils.GetInventoryFreeSlotCount()<2)return true;
+                    if(Utils.GetInventoryFreeSlotCount()<2||!VisitNeeded(cid,retainerId,"Disposal"))return true;
                 }
-                else if(!entrustOnly&&!(collection?NeedsCollection(cid,retainerId):NeedsOverflow(cid)))return true;
+                else if(!entrustOnly&&!(collection?NeedsCollection(cid,retainerId):NeedsOverflow(cid)&&plan!=null&&plan.DoesInventoryHaveMatchingItems(retainerId)&&VisitNeeded(cid,retainerId,"Overflow")))return true;
                 Svc.Log.Information("Steward {Operation}: selecting retainer {RetainerName} ({RetainerId})",
                     entrustOnly?"post-dresser entrust":collection?"collection":"overflow",name,retainerId);
                 P.TaskManager.InsertStack(()=>
@@ -157,6 +157,16 @@ internal static partial class CompanionPolicy
                 return true;
             },(collection?"Steward collection: ":"Steward overflow: ")+name);
         }
+    }
+    internal static bool VisitNeeded(ulong cid,ulong retainer,string operation,int listed=-1)
+    {
+        try
+        {
+            var needed=Svc.PluginInterface.GetIpcSubscriber<ulong,ulong,string,int,bool>("Steward.InventoryPolicy.RetainerVisitNeeded").InvokeFunc(cid,retainer,operation,listed);
+            if(!needed)Svc.Log.Debug("Skipped {Operation} visit to {Retainer}: no work for this retainer",operation,retainer);
+            return needed;
+        }
+        catch{return true;} // Older or disconnected companion: preserve live inspection.
     }
     private static bool NeedsCollection(ulong cid,ulong retainer)
     {
