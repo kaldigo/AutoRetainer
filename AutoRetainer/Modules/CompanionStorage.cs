@@ -143,7 +143,7 @@ internal static partial class CompanionPolicy
                     cleanup.Visited++;
                     if(Utils.GetInventoryFreeSlotCount()<2)return true;
                 }
-                else if(!entrustOnly&&!(collection?NeedsCollection(cid):NeedsOverflow(cid)))return true;
+                else if(!entrustOnly&&!(collection?NeedsCollection(cid,retainerId):NeedsOverflow(cid)))return true;
                 Svc.Log.Information("Steward {Operation}: selecting retainer {RetainerName} ({RetainerId})",
                     entrustOnly?"post-dresser entrust":collection?"collection":"overflow",name,retainerId);
                 P.TaskManager.InsertStack(()=>
@@ -158,10 +158,10 @@ internal static partial class CompanionPolicy
             },(collection?"Steward collection: ":"Steward overflow: ")+name);
         }
     }
-    private static bool NeedsCollection(ulong cid)
+    private static bool NeedsCollection(ulong cid,ulong retainer)
     {
         if(!Connected(cid)||HasFault)return false;
-        try{return Svc.PluginInterface.GetIpcSubscriber<ulong,bool>("Steward.InventoryPolicy.CollectionNeeded").InvokeFunc(cid);}
+        try{return Svc.PluginInterface.GetIpcSubscriber<ulong,ulong,bool>("Steward.InventoryPolicy.CollectionNeededForRetainer").InvokeFunc(cid,retainer);}
         catch{return false;}
     }
     private static bool NeedsOverflow(ulong cid)

@@ -1,3 +1,7 @@
+## Glamour collection
+
+During a Steward collection sweep, ask about each retainer's inventory before opening that retainer.
+
 ## 4.6.3.31
 
 The bell toolbar groups quick actions under Ventures, Storage, Market, Glamour and Disposal. Use the arrow beside each icon for options. Market, glamour and scoped disposal require the updated Steward companion.

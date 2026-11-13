@@ -19,6 +19,11 @@ class StorageBoundary(unittest.TestCase):
    self.assertLess(branch.index('if(playerItem->ItemId == item->ItemId'),branch.index('CompanionPolicy.AllowsSlot'))
   submit=text.split('private static void MoveSlotFromToRetainerInventoryUnsafe')[1]
   self.assertLess(submit.index('CompanionPolicy.AllowsSlot'),submit.index('pendingStorageType=type'))
+ def test_collection_selects_only_the_retainer_with_work(self):
+  text=(ROOT/'Modules/CompanionStorage.cs').read_text()
+  self.assertIn('collection?NeedsCollection(cid,retainerId)',text)
+  self.assertIn('"Steward.InventoryPolicy.CollectionNeededForRetainer").InvokeFunc(cid,retainer)',text)
+  self.assertLess(text.index('collection?NeedsCollection(cid,retainerId)'),text.index('TaskSelectRetainer.Enqueue(name)'))
  def test_collection_route_closes_bell_using_upstream_handler(self):
   text=(ROOT/'Modules/CompanionStorage.cs').read_text()
   self.assertIn('RetainerListHandlers.CloseRetainerList();',text)
