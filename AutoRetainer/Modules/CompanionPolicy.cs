@@ -33,6 +33,7 @@ internal static partial class CompanionPolicy
         ledger.Faults.UnionWith(ledger.Pending);
         if(!migrated || ledger.Owners.Count!=0 || ledger.Faults.Count!=0 || ledger.Pending.Count!=0)SavePolicy();
         ready=true;
+        Svc.PluginInterface.GetIpcProvider<int>("AutoRetainer.Workflow.Mask").RegisterFunc(()=>(int)NormalWorkflow.Parts);
         Svc.PluginInterface.GetIpcProvider<int>("AutoRetainer.InventoryPolicy.CleanupVersion").RegisterFunc(()=>1);
         Svc.PluginInterface.GetIpcProvider<ulong,bool>("AutoRetainer.InventoryPolicy.StartCleanup").RegisterFunc(StartCleanup);
         Svc.PluginInterface.GetIpcProvider<ulong,string,bool>("AutoRetainer.InventoryPolicy.StartScopedCleanup").RegisterFunc(StartScopedCleanup);
@@ -159,6 +160,7 @@ internal static partial class CompanionPolicy
         callback,heartbeat,Environment.TickCount64,true);
     private static bool AcquireControl(ulong cid)
     {
+        _ = NormalWorkflow.Active; // Retire any finished normal-run scope before independent work.
         return control.Acquire(cid,Connected(cid)&&!HasFault&&!ledger.Pending.Contains(cid),Utils.IsBusy,IPC.Suppressed,MaintainPauses);
     }
     internal static void MaintainPauses()
@@ -227,6 +229,7 @@ internal static partial class CompanionPolicy
         container<0||Utils.RetainerInventoriesWithCrystals.Contains((InventoryType)container));
     internal static unsafe bool Allows(string action, uint itemId, uint quantity = 1, int container = -1, int slot = -1,bool ownSubmission=false)
     {
+        if(!NormalWorkflow.AllowsAction(action))return false;
         if(!ready || ControlActive || HasFault || submission!=null&&!ownSubmission)return false;
         var cid = Svc.ClientState.LocalContentId;
         if(cid == 0) return false;
@@ -277,6 +280,7 @@ internal static partial class CompanionPolicy
 
     private static bool Run(ulong cid, string operation)
     {
+        if(!NormalWorkflow.AllowsAction(operation))return false;
         if(!Connected(cid) || HasFault || ledger.Pending.Contains(cid) || Utils.IsBusy) return false;
         if(operation is "Gc" or "Desynth" or "Vendor" && Data.GetIMSettings().IMDry)return false;
         switch(operation)
@@ -357,6 +361,7 @@ internal static partial class CompanionPolicy
     internal static void Shutdown()
     {
         if(cleanup.Active)EndCleanup("AutoRetainer unloaded",false);
+        Svc.PluginInterface.GetIpcProvider<int>("AutoRetainer.Workflow.Mask").UnregisterFunc();
         Svc.PluginInterface.GetIpcProvider<int>("AutoRetainer.InventoryPolicy.CleanupVersion").UnregisterFunc();
         Svc.PluginInterface.GetIpcProvider<ulong,bool>("AutoRetainer.InventoryPolicy.StartCleanup").UnregisterFunc();
         Svc.PluginInterface.GetIpcProvider<ulong,string,bool>("AutoRetainer.InventoryPolicy.StartScopedCleanup").UnregisterFunc();

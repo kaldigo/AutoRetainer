@@ -1,3 +1,7 @@
+# Workflow presets
+
+Add configurable normal-run workflow presets, a bell selector and `/autoretainer preset <name>`. Stock AutoDuty uses the selected preset through its existing enable command. Custom passes preserve Steward protections, keep an immutable run selection and avoid repeating non-venture visits. Update Steward for restricted workflow support.
+
 ## Retainer visit planning
 
 Use per-retainer bag observations and current carried stock to skip idle retainer visits. Explicit market inspection remains available.

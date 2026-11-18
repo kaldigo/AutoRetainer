@@ -48,9 +48,9 @@ class Standalone(unittest.TestCase):
 
     def test_manual_retainer_runs_native_ventures_but_not_ordinary_item_automation(self):
         scheduler=(ROOT/'Scheduler/SchedulerMain.cs').read_text(encoding='utf-8')
-        self.assertIn('if(manualItems&&!VentureDue(ret,adata))', scheduler)
-        self.assertIn('if(!manualItems&&C.EnableEntrustManager && selectedPlan != null)', scheduler)
-        self.assertEqual(scheduler.count('if(!manualItems&&Data.GetIMSettings().IMEnableAutoVendor)'), 2)
+        self.assertIn('if(manualItems&&(!Modules.NormalWorkflow.Allows(Modules.WorkflowParts.Ventures)||!VentureDue(ret,adata)))', scheduler)
+        self.assertIn('if(!manualItems&&Modules.NormalWorkflow.Allows(Modules.WorkflowParts.Entrust)&&C.EnableEntrustManager && selectedPlan != null)', scheduler)
+        self.assertEqual(scheduler.count('if(!manualItems&&Modules.NormalWorkflow.Allows(Modules.WorkflowParts.Disposal)&&Data.GetIMSettings().IMEnableAutoVendor)'), 2)
         self.assertIn('if(!manualItems)TaskPostprocessRetainerIPC.Enqueue(retainer);', scheduler)
         self.assertIn('Modules.PolicyStandalone.VisitManualRetainer', scheduler)
         self.assertIn('TaskReassignVenture.Enqueue(allowDiscard);', scheduler)

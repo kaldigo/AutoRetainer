@@ -38,6 +38,7 @@ internal unsafe class RetainerListOverlay : Window
 
     public override void Draw()
     {
+        UI.NeoUI.WorkflowPresets.Selector();
         var e = SchedulerMain.PluginEnabled;
         var disabled = MultiMode.Active && !ImGui.GetIO().KeyCtrl;
         if(disabled)
@@ -45,7 +46,7 @@ internal unsafe class RetainerListOverlay : Window
             ImGui.BeginDisabled();
         }
         var running=e || Utils.IsBusy || Modules.CompanionPolicy.CleanupActive;
-        if(ImGui.Button(running ? "Stop" : "Run all enabled"))
+        if(ImGui.Button(running ? "Stop" : "Run selected workflow"))
         {
             P.WasEnabled = false;
             if(!running)

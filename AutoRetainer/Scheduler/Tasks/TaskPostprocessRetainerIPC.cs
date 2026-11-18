@@ -1,9 +1,10 @@
-﻿namespace AutoRetainer.Scheduler.Tasks;
+namespace AutoRetainer.Scheduler.Tasks;
 
 internal static class TaskPostprocessRetainerIPC
 {
     internal static void Enqueue(string retainer, string pluginToProcess = null, string marketAction = null)
     {
+        if(!Modules.NormalWorkflow.StewardCompatible)return;
         if(!Modules.CompanionPolicy.CompanionAvailable)return; // Standalone visits run native ventures/entrust only.
         if(marketAction != null)
         {
@@ -36,7 +37,7 @@ internal static class TaskPostprocessRetainerIPC
             try
             {
                 DebugLog($"SchedulerMain.RetainerPostprocess contains: {SchedulerMain.RetainerPostprocess.Print()}, pluginToProcess = {pluginToProcess}");
-                foreach(var x in SchedulerMain.RetainerPostprocess.Where(x => pluginToProcess == null || x == pluginToProcess))
+                foreach(var x in SchedulerMain.RetainerPostprocess.Where(x => (pluginToProcess == null || x == pluginToProcess) && (x == "Steward" || Modules.NormalWorkflow.Allows(Modules.WorkflowParts.OtherPostprocessors))))
                 {
                     P.TaskManager.Enqueue(() =>
                     {

@@ -14,6 +14,7 @@ public class IPC_PluginState
     [EzIPC]
     public bool IsBusy()
     {
+        _ = NormalWorkflow.Active; // End an idle scope before the caller starts a different stage.
         return Utils.IsBusy;
     }
 
@@ -26,7 +27,7 @@ public class IPC_PluginState
     [EzIPC]
     public bool AreAnyRetainersAvailableForCurrentChara()
     {
-        return Utils.AnyRetainersAvailableCurrentChara();
+        return !NormalWorkflow.JustCompleted(Svc.ClientState.LocalContentId) && Utils.AnyRetainersAvailableCurrentChara();
     }
 
     [EzIPC]
@@ -129,6 +130,7 @@ public class IPC_PluginState
     [EzIPC]
     public long? GetClosestRetainerVentureSecondsRemaining(ulong CID)
     {
+        if(NormalWorkflow.JustCompleted(CID))return null;
         if(C.SelectedRetainers.TryGetValue(CID, out var enabledRetainers))
         {
             if(C.OfflineData.TryGetFirst(x => x.CID == CID, out var data))

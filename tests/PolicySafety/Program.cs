@@ -3,6 +3,32 @@ using AutoRetainer.Modules;
 var pending=new PolicyConfirmation(12,42,"Inventory1/0/42/1/None",1000);
 var total=0;
 void Check(bool result,string name){total++;if(!result)throw new Exception(name);}
+{
+    var preset=WorkflowPreset.Defaults().Single(p=>p.Name=="AutoDuty");
+    Check(preset.Parts==(WorkflowParts.Ventures|WorkflowParts.Gil|WorkflowParts.Entrust),"AutoDuty default permits only ventures, gil and entrust");
+    foreach(var action in new[]{"Market","Gc","Desynth","Vendor","Dresser","Armoire","Discard"})
+        Check(!WorkflowPreset.AllowsAction(preset.Parts,action),"AutoDuty excludes "+action);
+    Check(WorkflowPreset.AllowsAction(preset.Parts,"Entrust"),"AutoDuty allows native entrust");
+    Check(!WorkflowPreset.AllowsAction(WorkflowParts.None,"Gil"),"Empty preset cannot withdraw gil");
+    var run=new WorkflowRun();run.Begin(true,12,preset.Parts);run.Visit(5);
+    preset.Parts=WorkflowParts.Market;
+    Check(run.Parts.HasFlag(WorkflowParts.Entrust)&&!run.Parts.HasFlag(WorkflowParts.Market),"Editing selected preset leaves active snapshot unchanged");
+    run.Begin(true,12,preset.Parts);
+    Check(run.Visited(5)&&!run.Parts.HasFlag(WorkflowParts.Market),"Repeated enable cannot repeat retainer or switch active workflow");
+    Check(run.Refresh(12,false,false,false,true),"Disabled scheduler retains restrictions through Steward followup");
+    Check(run.Refresh(12,false,false,true,false),"Queued native work retains snapshot after disable");
+    Check(run.Refresh(12,false,true,false,false),"Bell pause retains run snapshot");
+    Check(!run.Refresh(12,false,false,false,false),"Completed idle run releases restrictions for manual workflows");
+    run.Begin(true,12,preset.Parts);
+    Check(!run.Visited(5)&&run.Parts==WorkflowParts.Market,"Next run picks selected preset and resets visits");
+    Check(!run.Refresh(13,true,false,true,true),"Character switch cannot inherit a normal run");
+    run.Begin(false,13,WorkflowParts.None);Check(!run.Active,"Multi mode and Artisan remain outside normal presets");
+    Check(WorkflowRun.ShouldVisit(WorkflowParts.Market,false,false,false,false),"Market-only visits do not depend on venture readiness");
+    Check(!WorkflowRun.ShouldVisit(WorkflowParts.Market,true,true,true,false),"Ordinary markets cannot visit manual-items retainers");
+    Check(WorkflowRun.ShouldVisit(WorkflowParts.Market,true,false,false,true),"Explicit strategy may visit a manual-items retainer");
+    Check(!WorkflowRun.ShouldVisit(WorkflowParts.None,false,true,true,true),"Empty preset visits nothing");
+    Check(!WorkflowRun.ShouldVisit(WorkflowParts.Ventures,false,false,true,true),"Ventures-only ignores market/gil work");
+}
 Check(PolicyStorageRouting.OwnsCompletedRun(12,12,4,4,true),"Finish only the scheduler run captured at dresser departure");
 Check(!PolicyStorageRouting.OwnsCompletedRun(12,13,4,4,true),"Never stop another character's run");
 Check(!PolicyStorageRouting.OwnsCompletedRun(12,12,4,5,true),"Never stop a run enabled again after capture");

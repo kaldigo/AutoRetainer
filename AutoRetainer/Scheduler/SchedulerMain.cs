@@ -1,4 +1,4 @@
-﻿using AutoRetainer.Internal;
+using AutoRetainer.Internal;
 using AutoRetainer.Scheduler.Handlers;
 using AutoRetainer.Scheduler.Tasks;
 using AutoRetainerAPI.Configuration;
@@ -39,6 +39,7 @@ internal static unsafe class SchedulerMain
 
     internal static bool? EnablePlugin(PluginEnableReason reason)
     {
+        Modules.NormalWorkflow.Begin(reason);
         Reason = reason;
         PluginEnabled = true;
         DebugLog($"Plugin is enabled, reason: {reason}");
@@ -54,6 +55,7 @@ internal static unsafe class SchedulerMain
 
     internal static void Tick()
     {
+        _ = Modules.NormalWorkflow.Active;
         if(PluginEnabled)
         {
             if(C.RetainerSense)
@@ -80,8 +82,9 @@ internal static unsafe class SchedulerMain
                                     P.TaskManager.Enqueue(() => RetainerListHandlers.SelectRetainerByName(retainer));
 
                                     var adata = Utils.GetAdditionalData(Svc.ClientState.LocalContentId, ret.Name.ToString());
+                                    Modules.NormalWorkflow.Visit(ret.RetainerID);
                                     var manualItems=C.CompanionGilOnlyRetainers.Contains(ret.RetainerID);
-                                    if(manualItems&&!VentureDue(ret,adata))
+                                    if(manualItems&&(!Modules.NormalWorkflow.Allows(Modules.WorkflowParts.Ventures)||!VentureDue(ret,adata)))
                                     {
                                         if(Modules.CompanionPolicy.Allows("Gil",0))TaskWithdrawGil.Enqueue(100);
                                         if(Modules.CompanionPolicy.StrategyDue(ret.RetainerID))
@@ -95,15 +98,16 @@ internal static unsafe class SchedulerMain
                                     }
 
 
-                                    if(!manualItems&&Data.GetIMSettings().IMEnableAutoVendor)
+                                    if(!manualItems&&Modules.NormalWorkflow.Allows(Modules.WorkflowParts.Disposal)&&Data.GetIMSettings().IMEnableAutoVendor)
                                     {
                                         TaskVendorItems.Enqueue();
                                     }
 
-                                    EnqueueVenture(ret, adata, allowDiscard: true);
+                                    if(Modules.NormalWorkflow.Allows(Modules.WorkflowParts.Ventures)&&VentureDue(ret,adata))
+                                        EnqueueVenture(ret, adata, allowDiscard: Modules.NormalWorkflow.Allows(Modules.WorkflowParts.Disposal));
 
                                     var selectedPlan = C.EntrustPlans.FirstOrDefault(x => x.Guid == adata.EntrustPlan && !x.ManualPlan);
-                                    if(!manualItems&&C.EnableEntrustManager && selectedPlan != null)
+                                    if(!manualItems&&Modules.NormalWorkflow.Allows(Modules.WorkflowParts.Entrust)&&C.EnableEntrustManager && selectedPlan != null)
                                     {
                                         TaskEntrustDuplicates.EnqueueNew(selectedPlan);
                                     }
@@ -123,7 +127,7 @@ internal static unsafe class SchedulerMain
                                         }
                                     }
 
-                                    if(!manualItems&&Data.GetIMSettings().IMEnableAutoVendor)
+                                    if(!manualItems&&Modules.NormalWorkflow.Allows(Modules.WorkflowParts.Disposal)&&Data.GetIMSettings().IMEnableAutoVendor)
                                     {
                                         TaskVendorItems.Enqueue();
                                     }
@@ -146,12 +150,15 @@ internal static unsafe class SchedulerMain
                             }
                             else
                             {
-                                if((C.Stay5 || MultiMode.Active) && !Utils.IsAllCurrentCharacterRetainersHaveMoreThan5Mins())
+                                if((!Modules.NormalWorkflow.SinglePass && C.Stay5 || MultiMode.Active) && !Utils.IsAllCurrentCharacterRetainersHaveMoreThan5Mins())
                                 {
                                     //nothing
                                 }
                                 else
                                 {
+                                    Modules.NormalWorkflow.Completed();
+                                    if(Modules.NormalWorkflow.SinglePass)
+                                        P.TaskManager.Enqueue(DisablePlugin);
                                     if(Reason == PluginEnableReason.MultiMode)
                                     {
                                         DebugLog($"Scheduling closing and disabling plugin as MultiMode is running");
@@ -411,6 +418,16 @@ internal static unsafe class SchedulerMain
                     var r = retainerData[i];
                     var rname = r.Name.ToString();
                     var adata = Utils.GetAdditionalData(Svc.ClientState.LocalContentId, rname);
+                    if(Modules.NormalWorkflow.SinglePass)
+                    {
+                        if(Modules.NormalWorkflow.Visited(r.RetainerID)||!P.GetSelectedRetainers(Svc.ClientState.LocalContentId).Contains(rname))continue;
+                        var selected=Modules.NormalWorkflow.Parts;
+                        var manual=C.CompanionGilOnlyRetainers.Contains(r.RetainerID);
+                        var visit=Modules.WorkflowRun.ShouldVisit(selected,manual,VentureDue(r,adata),
+                            manual?r.Gil>0:adata.WithdrawGil,manual&&Modules.CompanionPolicy.StrategyDue(r.RetainerID));
+                        if(visit)return rname;
+                        continue;
+                    }
                     if(C.CompanionGilOnlyRetainers.Contains(r.RetainerID))
                     {
                         if(Modules.PolicyStandalone.VisitManualRetainer(P.GetSelectedRetainers(Svc.ClientState.LocalContentId).Contains(rname),VentureDue(r,adata),r.Gil>0&&Modules.CompanionPolicy.Allows("Gil",0),Modules.CompanionPolicy.StrategyDue(r.RetainerID)))return rname;

@@ -43,6 +43,7 @@ internal static partial class CompanionPolicy
     private static bool StartCleanup(ulong cid)=>StartScopedCleanup(cid,"RetainersAll");
     private static bool StartScopedCleanup(ulong cid,string scope)
     {
+        _ = NormalWorkflow.Active; // Retire any finished normal-run scope before independent work.
         if(cleanup.Active)return false;
         bool Decline(string reason){cleanup.Stop(reason);return false;}
         var carried=scope.StartsWith("Carried",StringComparison.Ordinal);

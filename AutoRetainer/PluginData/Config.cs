@@ -8,6 +8,8 @@ namespace AutoRetainer.PluginData;
 [Serializable]
 internal unsafe class Config
 {
+    public List<Modules.WorkflowPreset> WorkflowPresets = Modules.WorkflowPreset.Defaults();
+    public string SelectedWorkflowPreset = "All enabled";
     public HashSet<Guid> CompanionRequiredCleanupPlans = [];
     public HashSet<ulong> CompanionGcFirstCharacters = [];
     // Legacy field name: manual storage/sales only; native ventures and gil are allowed.

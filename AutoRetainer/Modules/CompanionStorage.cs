@@ -37,6 +37,7 @@ internal static partial class CompanionPolicy
 
     private static unsafe bool ManualBell(ulong cid, string stage)
     {
+        _ = NormalWorkflow.Active; // Retire any finished normal-run scope before independent work.
         if(!Connected(cid) || HasFault || ledger.Pending.Contains(cid) || CleanupActive || Utils.IsBusy ||
             !SchedulerMain.ManualVentureControlAvailable || P.WasEnabled) return false;
         var atBell = Svc.Condition[Dalamud.Game.ClientState.Conditions.ConditionFlag.OccupiedSummoningBell];

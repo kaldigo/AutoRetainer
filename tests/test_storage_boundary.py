@@ -41,14 +41,14 @@ class StorageBoundary(unittest.TestCase):
   self.assertIn('slot->ItemId==pendingStorageItem&&slot->Quantity==pendingStorageQuantity',text)
  def test_manual_items_role_preserves_ventures_and_excludes_ordinary_item_work(self):
   text=(ROOT/'Scheduler/SchedulerMain.cs').read_text()
-  branch=text.split('if(manualItems&&!VentureDue(ret,adata))')[1].split('EnqueueVenture(ret, adata, allowDiscard: true)')[0]
+  branch=text.split('if(manualItems&&(!Modules.NormalWorkflow.Allows(Modules.WorkflowParts.Ventures)||!VentureDue(ret,adata)))')[1].split('EnqueueVenture(ret, adata, allowDiscard: Modules.NormalWorkflow.Allows(Modules.WorkflowParts.Disposal))')[0]
   self.assertIn('TaskWithdrawGil.Enqueue(100)',branch)
   self.assertIn('return;',branch)
   self.assertIn('TaskPostprocessRetainerIPC.Enqueue(retainer,"Steward")',branch)
   self.assertIn('CompanionPolicy.StrategyDue(ret.RetainerID)',branch)
   self.assertNotIn('TaskReassignVenture',branch)
-  self.assertIn('if(!manualItems&&C.EnableEntrustManager && selectedPlan != null)',text)
-  self.assertIn('if(!manualItems&&Data.GetIMSettings().IMEnableAutoVendor)',text)
+  self.assertIn('if(!manualItems&&Modules.NormalWorkflow.Allows(Modules.WorkflowParts.Entrust)&&C.EnableEntrustManager && selectedPlan != null)',text)
+  self.assertIn('if(!manualItems&&Modules.NormalWorkflow.Allows(Modules.WorkflowParts.Disposal)&&Data.GetIMSettings().IMEnableAutoVendor)',text)
   self.assertIn('VentureDue(r,adata)',text)
   self.assertIn('CompanionGilOnlyRetainers.Contains(retainer.RetainerID)',(ROOT/'Modules/CompanionStorage.cs').read_text())
  def test_gil_confirmation_rechecks_policy(self):

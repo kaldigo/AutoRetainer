@@ -279,7 +279,16 @@ public unsafe class AutoRetainer : IDalamudPlugin
 
     private void CommandHandler(string command, string arguments)
     {
-        if(arguments.EqualsIgnoreCase("debug"))
+        if(arguments.EqualsIgnoreCase("preset"))
+        {
+            DuoLog.Information($"Selected workflow: {Modules.NormalWorkflow.Selected.Name}. Presets: {string.Join(", ", C.WorkflowPresets.Select(p=>p.Name))}");
+        }
+        else if(arguments.StartsWith("preset ",StringComparison.OrdinalIgnoreCase))
+        {
+            if(Modules.NormalWorkflow.Select(arguments[7..].Trim()))DuoLog.Information($"Next normal run: {Modules.NormalWorkflow.Selected.Name}");
+            else DuoLog.Warning("Unknown workflow preset. Use /autoretainer preset to list names.");
+        }
+        else if(arguments.EqualsIgnoreCase("debug"))
         {
             config.Verbose = !config.Verbose;
             DuoLog.Information($"Debug mode {(config.Verbose ? "enabled" : "disabled")}");

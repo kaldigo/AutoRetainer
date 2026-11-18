@@ -1,4 +1,4 @@
-﻿using AutoRetainer.UI.NeoUI.AdvancedEntries;
+using AutoRetainer.UI.NeoUI.AdvancedEntries;
 using AutoRetainer.UI.NeoUI.AdvancedEntries.DebugSection;
 using AutoRetainer.UI.NeoUI.Experiments;
 using AutoRetainer.UI.NeoUI.InventoryManagementEntries;
@@ -15,6 +15,7 @@ public sealed class NeoWindow : Window
         new UserInterface(),
         new DeployablesTab(),
         new RetainersTab(),
+        new WorkflowPresets(),
         new Keybinds(),
 
         new MultiModeCommon(),
