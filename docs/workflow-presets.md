@@ -1,6 +1,6 @@
 # Normal-run workflow presets
 
-Open AutoRetainer settings â†’ Retainers â†’ Workflow presets. Select a preset, change its allowed workflows, or use **Save as new preset** to copy it under a unique name. The bell overlay also has a Workflow selector. Selection and edits apply to the next normal run, never start work, and never alter an active run's snapshot.
+Open AutoRetainer settings Ã¢â€ â€™ Retainers Ã¢â€ â€™ Workflow presets. Select a preset, change its allowed workflows, or use **Save as new preset** to copy it under a unique name. The bell overlay also has a Workflow selector. Selection and edits apply to the next normal run, never start work, and never alter an active run's snapshot.
 
 For AutoDuty:
 

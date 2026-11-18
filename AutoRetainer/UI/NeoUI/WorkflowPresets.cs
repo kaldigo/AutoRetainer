@@ -4,7 +4,7 @@ using ECommons.Configuration;
 namespace AutoRetainer.UI.NeoUI;
 public sealed class WorkflowPresets : NeoUIEntry
 {
-    public override string Path => "Retainers/Workflow presets";
+    public override string Path => "Workflow presets";
     public override NuiBuilder Builder { get; init; }
     private string newName="";
     private string error="";

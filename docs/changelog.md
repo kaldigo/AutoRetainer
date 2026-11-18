@@ -1,3 +1,7 @@
+# Workflow settings navigation fix
+
+Show Workflow presets as a top-level AutoRetainer settings page. The previous nested path collided with the existing Retainers page and was omitted by the settings tree. Open `/autoretainer settings` and click Workflow presets directly in the left sidebar.
+
 # Workflow presets
 
 Add configurable normal-run workflow presets, a bell selector and `/autoretainer preset <name>`. Stock AutoDuty uses the selected preset through its existing enable command. Custom passes preserve Steward protections, keep an immutable run selection and avoid repeating non-venture visits. Update Steward for restricted workflow support.
@@ -70,7 +74,7 @@ Fix severe update stalls after adding the first inherited protection to a Stewar
 
 Check entrust category/duplicate matches before consulting Steward, retaining policy checks at candidate selection, command submission and numeric confirmation. Before a companion-requested armoire or dresser visit, close the bell through the existing AutoRetainer handler and wait for it to release. Continue using upstream travel and storage workflows. Original identity, navigation, enabled methods and demo mode remain unchanged. In-game speed and collection acceptance remain pending.
 
-Fix the Steward collection sweep stalling at the retainer list: reuse AutoRetainer’s existing decoded retainer list and selector instead of converting a native byte span to text. Log retainer selection steps. Publish the previously tested companion storage/gil-only boundaries, optional strategy coordination, GC-first disposal priority and shared demo-mode guard for GC delivery, desynthesis and selling. Native retainer selection remains unchanged. Original plugin identity and upstream functionality are preserved. In-game collection acceptance remains pending.
+Fix the Steward collection sweep stalling at the retainer list: reuse AutoRetainerâ€™s existing decoded retainer list and selector instead of converting a native byte span to text. Log retainer selection steps. Publish the previously tested companion storage/gil-only boundaries, optional strategy coordination, GC-first disposal priority and shared demo-mode guard for GC delivery, desynthesis and selling. Native retainer selection remains unchanged. Original plugin identity and upstream functionality are preserved. In-game collection acceptance remains pending.
 
 Steward decision-review integration: optional collection sweep reuses existing retainer postprocessing; read-only disposal selection shares the original hard-list predicate and enabled methods. Original identity, recoloured icon, workflows and protocol-6 safety gates remain unchanged. Paired Steward update intended for log-only decision validation; native execution acceptance remains pending.
 
