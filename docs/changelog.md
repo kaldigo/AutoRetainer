@@ -1,3 +1,7 @@
+## Collected surplus discard
+
+Added an optional final discard stage to the full cleanup pass. Only nonmarketable surplus gear with a verified collection copy can qualify. A completed in-game GC inspection must offer no seals, and the item must have no NPC sale value or desynthesis support. The option defaults off and follows log-only, Demo mode, gearset, keep and other protection rules.
+
 # Workflow settings navigation fix
 
 Show Workflow presets as a top-level AutoRetainer settings page. The previous nested path collided with the existing Retainers page and was omitted by the settings tree. Open `/autoretainer settings` and click Workflow presets directly in the left sidebar.

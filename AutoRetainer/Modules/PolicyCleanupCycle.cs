@@ -1,6 +1,6 @@
 namespace AutoRetainer.Modules;
 
-internal enum CleanupPhase { Idle, Bell, Withdraw, Gc, Desynth, Return, Vendor, Review, Complete, Stopped }
+internal enum CleanupPhase { Idle, Bell, Withdraw, Gc, Desynth, Return, Vendor, Discard, Review, Complete, Stopped }
 
 // Coordinates existing actions; never grants an item permission or submits a game action.
 internal sealed class PolicyCleanupCycle
@@ -26,7 +26,7 @@ internal sealed class PolicyCleanupCycle
     {
         CleanupPhase.Bell=>CleanupPhase.Withdraw, CleanupPhase.Withdraw=>CleanupPhase.Gc,
         CleanupPhase.Gc=>CleanupPhase.Desynth, CleanupPhase.Desynth=>CleanupPhase.Return,
-        CleanupPhase.Return=>CleanupPhase.Vendor, CleanupPhase.Vendor=>CleanupPhase.Review,
+        CleanupPhase.Return=>CleanupPhase.Vendor, CleanupPhase.Vendor=>CleanupPhase.Discard, CleanupPhase.Discard=>CleanupPhase.Review,
         _=>throw new InvalidOperationException("Unexpected cleanup transition")
     };
     internal void Review(bool hasSpace,bool gcRemaining)

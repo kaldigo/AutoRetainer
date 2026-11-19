@@ -2,6 +2,7 @@ namespace AutoRetainer.Modules;
 
 internal static class PolicyDisposal
 {
+    internal static bool DiscardOnlyRoute(uint? npcSaleValue,bool? supportsDesynth)=>npcSaleValue==0&&supportsDesynth==false;
     internal static bool CanVendor(uint? npcSaleValue)=>npcSaleValue is >0;
     internal static bool CanDesynth(bool unlocked,bool enabled,bool supported,int craftingLevel)=>
         unlocked&&enabled&&supported&&craftingLevel>=30;

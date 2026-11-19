@@ -43,7 +43,7 @@ internal static partial class CompanionPolicy
         Svc.PluginInterface.GetIpcProvider<ulong,ulong,uint,bool>("AutoRetainer.InventoryPolicy.CleanupWithdrawalConfirmed").RegisterFunc(CleanupWithdrawalConfirmed);
         Svc.PluginInterface.GetIpcProvider<uint,uint,bool>("AutoRetainer.InventoryPolicy.DisposalSelected").RegisterFunc((id,quantity)=>
             CompanionAvailable&&!Data.GetIMSettings().IMDry&&Utils.IsItemSelectedByHardList(id,quantity)&&
-            (GcDisposalCandidate(id)&&MethodInScope("Gc")||MethodEnabled("Vendor")&&VendorDisposalEligible(id)&&DisposalMethodAllows("Vendor",id)||DesynthDisposalEligible(id)&&DisposalMethodAllows("Desynth",id)));
+            (cleanup.Active&&cleanupMethod=="All"&&MethodEnabled("Gc")&&SurplusDiscardCandidate(id)||GcDisposalCandidate(id)&&MethodInScope("Gc")||MethodEnabled("Vendor")&&VendorDisposalEligible(id)&&DisposalMethodAllows("Vendor",id)||DesynthDisposalEligible(id)&&DisposalMethodAllows("Desynth",id)));
         Svc.PluginInterface.GetIpcProvider<uint,uint,string>("AutoRetainer.InventoryPolicy.DisposalPreview").RegisterFunc(DisposalPreview);
         Svc.Framework.Update+=Tick;
         Svc.PluginInterface.GetIpcProvider<int>("AutoRetainer.InventoryPolicy.StorageVersion").RegisterFunc(()=>5);
@@ -83,6 +83,8 @@ internal static partial class CompanionPolicy
     {
         if(!IsManaged||!Connected(Svc.ClientState.LocalContentId))return "AutoRetainer companion unavailable; held";
         var mode=Data.GetIMSettings();
+        if(SurplusDiscardCandidate(id))
+            return "Collected surplus: GC inspection first, then discard only if the game offers no seals and no desynthesis or NPC sale is possible";
         if(!Utils.IsItemSelectedByHardList(id,quantity))
             return NonEquipmentDisposalSelected(id)&&!mode.IMAutoVendorHardIgnoreStack.Contains(id)&&quantity>=mode.IMAutoVendorHardStackLimit
                 ?$"Held by AutoRetainer stack limit: {quantity} in source; requires fewer than {mode.IMAutoVendorHardStackLimit}"
@@ -99,9 +101,10 @@ internal static partial class CompanionPolicy
         // The native GC list remains the final authority; never downgrade held GC candidates to vendor.
         return item.HasValue&&Data.GCDeliveryType!=AutoRetainerAPI.Configuration.GCDeliveryType.Disabled&&
             item.Value.ItemUICategory.RowId.EqualsAny([.. Utils.ArmorsUICategories,.. Utils.WeaponsUICategories])&&
-            item.Value.GetRarity().EqualsAny(ItemRarity.Green,ItemRarity.Pink,ItemRarity.Blue)&&item.Value.Desynth>0;
+            item.Value.GetRarity().EqualsAny(ItemRarity.Green,ItemRarity.Pink,ItemRarity.Blue)&&(item.Value.Desynth>0||NativeGcReward(id)>0);
     }
-    private static bool DisposalMethodAllows(string action,uint id)=>action is not ("Gc" or "Desynth" or "Vendor")||
+    private static bool DisposalMethodAllows(string action,uint id)=>action=="Discard"?
+        cleanup.Active&&cleanup.Phase==CleanupPhase.Discard&&cleanupMethod=="All"&&!Data.GetIMSettings().IMDry&&SurplusDiscardCandidate(id):action is not ("Gc" or "Desynth" or "Vendor")||
         MethodInScope(action)&&(action!="Vendor"||VendorDisposalEligible(id))&&PolicyDisposal.Allows(action,Data.GetIMSettings().IMDry,
         C.CompanionGcFirstCharacters.Contains(Svc.ClientState.LocalContentId)||cleanup.Active,GcDisposalCandidate(id),
         DesynthDisposalEligible(id));

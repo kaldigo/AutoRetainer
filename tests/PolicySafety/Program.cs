@@ -40,7 +40,8 @@ Check(!PolicyStorageRouting.OwnsCompletedRun(0,0,0,0,true),"Missing ownership ca
         if(c.Phase==CleanupPhase.Bell)c.Advance();
         c.Visited=2;c.ConfirmWithdrawal(withdrawn);c.Advance();
         c.ConfirmDisposal(disposed);c.Advance();c.Advance();c.Advance();c.Advance();
-        Check(c.Phase==CleanupPhase.Review,"Cleanup uses withdrawal, GC, desynthesis, return and vendor stages");
+        Check(c.Phase==CleanupPhase.Discard,"Discard follows GC, desynthesis and vendor stages");c.Advance();
+        Check(c.Phase==CleanupPhase.Review,"Cleanup uses withdrawal, GC, desynthesis, return, vendor and discard stages");
     }
     var cycle=new PolicyCleanupCycle();
     Check(!cycle.Active,"Cleanup does not start on load");
@@ -306,3 +307,19 @@ Check(!PolicyDisposal.CanVendor(null),"Unknown NPC sale value cannot permit vend
 Check(!PolicyDisposal.CanVendor(0),"Eternity Cake and other zero-price items cannot be vendored");
 Check(PolicyDisposal.CanVendor(1)&&PolicyDisposal.CanVendor(15840),"Positive NPC sale values permit vendor route eligibility");
 Console.WriteLine($"{total} checks passed including NPC sale-value eligibility.");
+
+Check(PolicyDisposal.DiscardOnlyRoute(0,false),"Zero-value non-desynth gear may be considered for surplus discard");
+Check(!PolicyDisposal.DiscardOnlyRoute(1,false),"NPC value preserves the vendor route");
+Check(!PolicyDisposal.DiscardOnlyRoute(0,true),"Supported desynthesis prevents discard even when unavailable");
+Check(!PolicyDisposal.DiscardOnlyRoute(null,false)&&!PolicyDisposal.DiscardOnlyRoute(0,null),"Unknown capability never qualifies for discard");
+
+{
+    var source=new PolicyItemIdentity(42617,1,0,5,0);
+    var proof=PolicyGcExclusion.Capture(123,source,0);
+    Check(proof!=null&&proof.Matches(123,source),"Completed zero-seal inspection identifies the same surplus source");
+    Check(!proof.Matches(124,source)&&!proof.Matches(123,source with{Slot=6}),"Character or slot changes invalidate GC evidence");
+    Check(!proof.Matches(123,source with{ItemId=42616})&&!proof.Matches(123,source with{Quantity=2}),"Changed item or quantity invalidates GC evidence");
+    Check(PolicyGcExclusion.Capture(123,source,null)==null,"Unavailable GC data never permits discard");
+    Check(PolicyGcExclusion.Capture(123,source,460)==null,"Positive GC reward prevents fallback discard");
+    Check(PolicyGcExclusion.Capture(0,source,0)==null,"Missing character cannot seal GC evidence");
+}

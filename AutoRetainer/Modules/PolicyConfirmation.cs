@@ -56,3 +56,10 @@ internal static class PolicyAcknowledgement
         return PolicyAck.Waiting;
     }
 }
+
+internal sealed record PolicyGcExclusion(ulong Character,PolicyItemIdentity Source)
+{
+    internal static PolicyGcExclusion Capture(ulong character,PolicyItemIdentity source,int? sealReward)=>
+        character!=0&&source!=null&&source.ItemId!=0&&source.Quantity==1&&sealReward==0?new(character,source):null;
+    internal bool Matches(ulong character,PolicyItemIdentity current)=>Character==character&&Source.Matches(current);
+}

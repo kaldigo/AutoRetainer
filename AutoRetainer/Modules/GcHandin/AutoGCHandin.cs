@@ -263,6 +263,7 @@ internal static unsafe class AutoGCHandin
                 if(IsDone(addon))
                 {
                     var s = $"Automatic handin has been completed";
+                    CompanionPolicy.ObserveSurplusGcList();
                     CompanionPolicy.CleanupGcCompleted();
                     DuoLog.Information(s);
                     if(C.GCHandinNotify)

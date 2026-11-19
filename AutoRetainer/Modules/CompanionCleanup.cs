@@ -56,6 +56,7 @@ internal static partial class CompanionPolicy
         if(!Player.IsInHomeWorld)return Decline("Return to your home world before starting full cleanup");
         if(!carried && (method is "All" or "Gc") && MethodEnabled("Gc") && !Data.GetIsTeleportEnabledForRetainers())
             return Decline("Enable AutoRetainer's retainer teleport/return travel so the GC batch can return to a bell");
+        gcDiscardEvidence.Clear();discardAttempted.Clear();
         cleanupMethod=method;cleanupCarried=carried;cleanup.Start(cid);cleanupAwaiting=false;cleanupTaskFinished=false;cleanupIdleSince=0;
         Svc.Log.Information("[Steward cleanup] Started for character {Character}",cid);
         return true;
@@ -70,6 +71,7 @@ internal static partial class CompanionPolicy
         if(!cleanup.Active)return;
         var gc=cleanup.Phase==CleanupPhase.Gc;
         var travel=cleanup.Phase is CleanupPhase.Bell or CleanupPhase.Return or CleanupPhase.Gc;
+        CancelSurplusDiscard();
         cleanup.Stop(reason);cleanupAwaiting=false;
         P.TaskManager.Abort();
         if(travel)
@@ -137,12 +139,13 @@ internal static partial class CompanionPolicy
                     {EndCleanup("No bell is reachable and AutoRetainer has no enabled return route",false);return;}
                     break;
                 case CleanupPhase.Withdraw:
+                    gcDiscardEvidence.Clear();discardAttempted.Clear();
                     if(cleanupCarried)break;
                     if(!EnqueueOverflow(cleanup.Character,disposalOnly:true)){EndCleanup("Could not begin the retainer withdrawal pass",false);return;}
                     break;
                 case CleanupPhase.Gc:
                     cleanupGcStarted=false;cleanupGcFinished=false;
-                    if(MethodInScope("Gc") && GCContinuation.DoesInventoryHaveDeliverableItem())
+                    if(MethodInScope("Gc") && (GCContinuation.DoesInventoryHaveDeliverableItem()||SurplusNeedsGcInspection()))
                     {
                         if(!TaskDeliverItems.Enqueue()){EndCleanup("AutoRetainer could not begin GC delivery",false);return;}
                         cleanupGcStarted=true;
@@ -150,6 +153,9 @@ internal static partial class CompanionPolicy
                     break;
                 case CleanupPhase.Desynth:
                     if(MethodInScope("Desynth") && Data.GetIMSettings().IMEnableItemDesynthesis)TaskDesynthItems.Enqueue();
+                    break;
+                case CleanupPhase.Discard:
+                    if(cleanupMethod=="All")P.TaskManager.Enqueue(RunSurplusDiscard,"Discard verified collected surplus",new(timeLimitMS:10*60*1000));
                     break;
                 case CleanupPhase.Vendor:
                     if(MethodInScope("Vendor"))TaskVendorItems.EnqueueFromCommand();

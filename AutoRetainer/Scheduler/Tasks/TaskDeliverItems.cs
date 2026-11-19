@@ -19,7 +19,7 @@ public static unsafe class TaskDeliverItems
     public static bool Enqueue(bool force = false)
     {
         if((CompanionPolicy.IsManaged||CompanionPolicy.UsesStewardCleanupPlan)&&
-            (Data.GetIMSettings().IMDry||!GCContinuation.DoesInventoryHaveDeliverableItem()))return false;
+            (Data.GetIMSettings().IMDry||!GCContinuation.DoesInventoryHaveDeliverableItem()&&!CompanionPolicy.SurplusNeedsGcInspection()))return false;
         UsingItemBuff = false;
         var gcInfo = GCContinuation.GetFullGCInfo();
         if(gcInfo == null)

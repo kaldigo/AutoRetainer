@@ -42,6 +42,7 @@ internal static partial class CompanionPolicy
     internal static unsafe bool SubmitSlot(string action,InventoryType type,int slot,Action native,uint removed=0,uint cabinetRow=0)
     {
         if(!IsManaged){if(!AllowsSlot(action,type,slot))return false;native();return true;}
+        if(action=="Discard"&&!GcRejectedSource(type,slot))return false;
         if(submission!=null || ledger.Pending.Contains(Svc.ClientState.LocalContentId) || !AllowsSlot(action,type,slot))return false;
         var source=ReadIdentity(type,slot);if(source==null || source.ItemId==0 || source.Quantity==0)return false;
         var before=CountSource(source);if(before==null)return false;
@@ -102,7 +103,8 @@ internal static partial class CompanionPolicy
             {
                 if(pending.Action=="Desynth")Svc.Log.Information("[Steward submission] Desynth acknowledged: item={Item}, before={Before}, after={After}, sourceNow={Current}",pending.Source.ItemId,pending.Before,after,current);
                 CompleteTransaction();submission=null;
-                if(pending.Action is "Vendor" or "Desynth")cleanup.ConfirmDisposal(pending.Removed);
+                if(pending.Action=="Discard")Svc.Log.Information("[Steward submission] Discard confirmed: item={Item}, before={Before}, after={After}",pending.Source.ItemId,pending.Before,after);
+                if(pending.Action is "Vendor" or "Desynth" or "Discard")cleanup.ConfirmDisposal(pending.Removed);
             }
         }
         catch(Exception ex){ReportFault(pending.Action+" requires inventory review: "+ex.Message);}
