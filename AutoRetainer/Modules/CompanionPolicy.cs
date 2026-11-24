@@ -79,6 +79,10 @@ internal static partial class CompanionPolicy
         try{return Svc.PluginInterface.GetIpcSubscriber<ulong,uint,bool>("Steward.InventoryPolicy.NonEquipmentDisposalSelected").InvokeFunc(cid,id);}
         catch{return false;}
     }
+    // Real withdrawal and sale still require Steward's slot-specific approval.
+    internal static bool UsesStewardDisposalSelection =>
+        IsManaged && Connected(Svc.ClientState.LocalContentId) && (cleanup.Active || UsesStewardCleanupPlan);
+
     private static string DisposalPreview(uint id,uint quantity)
     {
         if(!IsManaged||!Connected(Svc.ClientState.LocalContentId))return "AutoRetainer companion unavailable; held";
@@ -86,7 +90,8 @@ internal static partial class CompanionPolicy
         if(SurplusDiscardCandidate(id))
             return "Collected surplus: GC inspection first, then discard only if the game offers no seals and no desynthesis or NPC sale is possible";
         if(!Utils.IsItemSelectedByHardList(id,quantity))
-            return NonEquipmentDisposalSelected(id)&&!mode.IMAutoVendorHardIgnoreStack.Contains(id)&&quantity>=mode.IMAutoVendorHardStackLimit
+            return !UsesStewardDisposalSelection&&quantity>=mode.IMAutoVendorHardStackLimit&&
+                !mode.IMProtectList.Contains(id)&&mode.IMAutoVendorHard.Contains(id)&&!mode.IMAutoVendorHardIgnoreStack.Contains(id)
                 ?$"Held by AutoRetainer stack limit: {quantity} in source; requires fewer than {mode.IMAutoVendorHardStackLimit}"
                 :"Not selected by AutoRetainer cleanup plan";
         var method=GcDisposalCandidate(id)?"GC delivery":DesynthDisposalEligible(id)?"Desynthesis":

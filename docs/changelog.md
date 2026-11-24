@@ -1,3 +1,7 @@
+## Steward cleanup fixes
+
+Record expert-delivery evidence on either successful completion path before closing the list. Steward-managed cleanup can process approved stacks above the ordinary hard vendor stack cutoff. Exact source checks, protection, Demo mode and final companion approval still apply.
+
 ## Collected surplus discard
 
 Added an optional final discard stage to the full cleanup pass. Only nonmarketable surplus gear with a verified collection copy can qualify. A completed in-game GC inspection must offer no seals, and the item must have no NPC sale value or desynthesis support. The option defaults off and follows log-only, Demo mode, gearset, keep and other protection rules.

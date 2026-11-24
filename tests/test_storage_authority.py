@@ -27,7 +27,7 @@ class StorageAuthority(unittest.TestCase):
         self.assertIn('catch{C.CompanionCurrencyRetainers.Remove(cid);throw;}', text)
         self.assertIn('if(!Connected(cid))return false;', text)
 
-    def test_non_equipment_category_selection_is_scoped_and_still_stack_limited(self):
+    def test_managed_selection_bypasses_only_the_native_hard_stack_cutoff(self):
         text = (ROOT / 'Modules/CompanionPolicy.cs').read_text(encoding='utf-8')
         selection = text.split('internal static bool NonEquipmentDisposalSelected')[1].split('private static string DisposalPreview')[0]
         self.assertIn('!UsesStewardCleanupPlan||!Connected(cid)', selection)
@@ -35,7 +35,9 @@ class StorageAuthority(unittest.TestCase):
         self.assertIn('catch{return false;}', selection)
         native = (ROOT / 'Internal/InventoryManagement/InventorySpaceManager.cs').read_text(encoding='utf-8')
         self.assertIn('CompanionPolicy.NonEquipmentDisposalSelected(item.ItemId)', native)
-        self.assertIn('item.Quantity < Data.GetIMSettings().IMAutoVendorHardStackLimit', native)
+        self.assertIn('CompanionPolicy.UsesStewardDisposalSelection || item.Quantity < Data.GetIMSettings().IMAutoVendorHardStackLimit', native)
+        self.assertIn('IsManaged && Connected(Svc.ClientState.LocalContentId) && (cleanup.Active || UsesStewardCleanupPlan)', text)
+        self.assertIn('if(!CompanionPolicy.AllowsSlot("Vendor", Task.InventoryType, (int)Task.Slot)) return true;', native)
         self.assertIn('CompanionPolicy.AllowsSlot("Vendor", invType, i)', native)
         desynth = (ROOT / 'Scheduler/Tasks/TaskDesynthItems.cs').read_text(encoding='utf-8')
         self.assertIn('IsOnIMList(item->ItemId,item->Quantity)', desynth)

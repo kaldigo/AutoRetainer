@@ -46,10 +46,16 @@ internal static partial class CompanionPolicy
         return false;
     }
     // Called only at completion of the ready, correctly filtered expert delivery list.
-    internal static unsafe void ObserveSurplusGcList()
+    internal static unsafe void ObserveSurplusGcList(IReadOnlyList<(uint ItemID,uint Seals)> rows)
     {
         if(!cleanup.Active||cleanup.Phase!=CleanupPhase.Gc||cleanupMethod!="All")return;
         gcDiscardEvidence.Clear();
+        var agent=AgentGrandCompanySupply.Instance();
+        if(agent==null||!agent->IsAgentActive()||agent->SelectedTab!=2||agent->NumItems!=rows.Count)
+        {
+            Svc.Log.Information("[Steward discard] Expert delivery list could not be verified; no discard evidence recorded");
+            return;
+        }
         var manager=InventoryManager.Instance();if(manager==null)return;
         foreach(var type in Utils.PlayerInvetories)
         {
@@ -58,7 +64,7 @@ internal static partial class CompanionPolicy
             {
                 var identity=ReadIdentity(type,slot);
                 if(identity==null||identity.Quantity!=1||!SurplusDiscardCandidate(identity.ItemId))continue;
-                var reward=NativeGcReward(identity.ItemId);
+                var reward=(int)rows.Where(row=>row.ItemID==identity.ItemId).Select(row=>row.Seals).DefaultIfEmpty().Max();
                 Svc.Log.Information("[Steward discard] Expert delivery observation: item={Item}, seals={Seals}, container={Container}, slot={Slot}",identity.ItemId,reward,type,slot);
                 if(PolicyGcExclusion.Capture(Svc.ClientState.LocalContentId,identity,reward) is {} proof)gcDiscardEvidence[(type,slot)]=proof;
             }

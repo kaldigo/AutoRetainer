@@ -2,6 +2,15 @@ import unittest
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]/'AutoRetainer'
 class DisposalBoundary(unittest.TestCase):
+ def test_both_normal_gc_completion_paths_record_the_live_list(self):
+  source=(ROOT/'Modules/GcHandin/AutoGCHandin.cs').read_text(encoding='utf-8-sig')
+  handler=source.split('private static void HandleGCList()')[1].split('private static void CompleteManagedGcInspection')[0]
+  self.assertEqual(handler.count('CompleteManagedGcInspection(addon);'),2)
+  self.assertIn('CleanupGcCompleted(true)',handler)
+  finish=source.split('private static void CompleteManagedGcInspection')[1].split('private static bool IsReadyToOperate')[0]
+  self.assertLess(finish.index('ObserveSurplusGcList(rows)'),finish.index('CleanupGcCompleted()'))
+  self.assertIn('reader.NumItems == rows.Count',finish)
+
  def test_final_policy_checks_disposal_method(self):
   source=(ROOT/'Modules/CompanionPolicy.cs').read_text()
   self.assertIn('return result == "Allow" && Connected(cid) && DisposalMethodAllows(action,itemId)',source)

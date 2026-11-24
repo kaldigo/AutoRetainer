@@ -263,8 +263,7 @@ internal static unsafe class AutoGCHandin
                 if(IsDone(addon))
                 {
                     var s = $"Automatic handin has been completed";
-                    CompanionPolicy.ObserveSurplusGcList();
-                    CompanionPolicy.CleanupGcCompleted();
+                    CompleteManagedGcInspection(addon);
                     DuoLog.Information(s);
                     if(C.GCHandinNotify)
                     {
@@ -313,7 +312,7 @@ internal static unsafe class AutoGCHandin
                                 {
                                     if(FindNextHandinItem(false) == null)
                                     {
-                                        CompanionPolicy.CleanupGcCompleted();
+                                        CompleteManagedGcInspection(addon);
                                         GCContinuation.EnqueueDeliveryClose();
                                         EzThrottler.Reset($"GcBusy");
                                         throw new GCHandinInterruptedException("Auto GC handin completed");
@@ -361,6 +360,19 @@ internal static unsafe class AutoGCHandin
         {
             Overlay.Allowed = Operation || IsReadyToOperate(addon);
         }
+    }
+
+    private static void CompleteManagedGcInspection(AtkUnitBase* addon)
+    {
+        // Only record absence from a ready list whose row count matches the native data.
+        var reader = new ReaderGrandCompanySupplyList(addon);
+        if(IsListReady() && reader.NumItems <= 1000)
+        {
+            var rows = GetHandinItems();
+            if(reader.NumItems == rows.Count)
+                CompanionPolicy.ObserveSurplusGcList(rows);
+        }
+        CompanionPolicy.CleanupGcCompleted();
     }
 
     private static bool IsReadyToOperate(AtkUnitBase* GCSupplyListAddon)
