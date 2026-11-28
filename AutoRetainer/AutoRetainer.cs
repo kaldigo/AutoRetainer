@@ -817,6 +817,8 @@ public unsafe class AutoRetainer : IDalamudPlugin
                 IsCloseActionAutomatic = false;
                 return;
             }
+            if(value)
+                CompanionPolicy.AnnounceConnectionNeeded(Svc.ClientState.LocalContentId);
             if(!SkipNextEnable)
             {
                 if(Svc.Targets.Target.IsRetainerBell())

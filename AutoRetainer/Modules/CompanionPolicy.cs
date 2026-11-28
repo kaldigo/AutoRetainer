@@ -12,6 +12,7 @@ internal static partial class CompanionPolicy
     private static string callback;
     private static ulong character;
     private static long heartbeat;
+    private static ulong announcedCharacter;
     private static ulong handoffCharacter;
     private static readonly PolicyControl control=new();
     private static PolicyLedger ledger=new();
@@ -33,6 +34,7 @@ internal static partial class CompanionPolicy
         ledger.Faults.UnionWith(ledger.Pending);
         if(!migrated || ledger.Owners.Count!=0 || ledger.Faults.Count!=0 || ledger.Pending.Count!=0)SavePolicy();
         ready=true;
+        announcedCharacter=0;
         Svc.PluginInterface.GetIpcProvider<int>("AutoRetainer.Workflow.Mask").RegisterFunc(()=>(int)NormalWorkflow.Parts);
         Svc.PluginInterface.GetIpcProvider<int>("AutoRetainer.InventoryPolicy.CleanupVersion").RegisterFunc(()=>1);
         Svc.PluginInterface.GetIpcProvider<ulong,bool>("AutoRetainer.InventoryPolicy.StartCleanup").RegisterFunc(StartCleanup);
@@ -182,9 +184,28 @@ internal static partial class CompanionPolicy
     internal static void EndHandoff() => handoffCharacter=0;
     private static bool OwnsHandoff(ulong cid) => Connected(cid)&&cid==handoffCharacter && HandoffLease.Owns(handoffCharacter,character,
         Svc.ClientState.LocalContentId,callback,heartbeat,Environment.TickCount64,SchedulerMain.RetainerPostProcessLocked);
+    internal static void AnnounceConnectionNeeded(ulong current)
+    {
+        if(!ready||current==0)return;
+        try
+        {
+            Svc.PluginInterface.GetIpcProvider<ulong,object>("AutoRetainer.InventoryPolicy.ConnectionRequested").SendMessage(current);
+        }
+        catch(Exception ex)
+        {
+            Svc.Log.Debug(ex,"Could not announce AutoRetainer companion readiness");
+        }
+    }
+
     private static void Tick(Dalamud.Plugin.Services.IFramework _)
     {
         CheckSubmission();
+        var current=Svc.ClientState.LocalContentId;
+        if(current!=announcedCharacter)
+        {
+            announcedCharacter=current;
+            AnnounceConnectionNeeded(current);
+        }
         try{TickCleanup();}catch(Exception ex){EndCleanup("Coordinator failed: "+ex.Message,true);}
         foreach(var cid in ledger.Pending.Where(id=>id!=Svc.ClientState.LocalContentId).ToArray())
             if(ledger.Faults.Add(cid))try{SavePolicy();}catch(Exception ex){Svc.Log.Error(ex,"Could not persist interrupted transaction hold");}

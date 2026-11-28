@@ -1,3 +1,7 @@
+## Companion connection announcement
+
+AutoRetainer announces policy readiness when it loads for a character. Steward can attach on that announcement rather than querying repeatedly while disconnected. The existing attached safety lease still expires if renewal stops.
+
 ## Cleanup bell and expert delivery evidence
 
 Keep the normal scheduler idle throughout managed cleanup, including vendor visits and later withdrawal batches. Use the validated Expert Delivery list for both hand-in eligibility and surplus seal checks. Missing or inconsistent rows still hold discard and log the reason.
