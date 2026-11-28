@@ -810,6 +810,13 @@ public unsafe class AutoRetainer : IDalamudPlugin
                 ConditionWasEnabled = false;
                 DebugLog("ConditionWasEnabled = false;");
             }
+            if(CompanionPolicy.CleanupActive || SkipNextEnable)
+            {
+                IsInteractionAutomatic = false;
+                SkipNextEnable = false;
+                IsCloseActionAutomatic = false;
+                return;
+            }
             if(!SkipNextEnable)
             {
                 if(Svc.Targets.Target.IsRetainerBell())

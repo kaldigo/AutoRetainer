@@ -106,7 +106,7 @@ internal static partial class CompanionPolicy
         // The native GC list remains the final authority; never downgrade held GC candidates to vendor.
         return item.HasValue&&Data.GCDeliveryType!=AutoRetainerAPI.Configuration.GCDeliveryType.Disabled&&
             item.Value.ItemUICategory.RowId.EqualsAny([.. Utils.ArmorsUICategories,.. Utils.WeaponsUICategories])&&
-            item.Value.GetRarity().EqualsAny(ItemRarity.Green,ItemRarity.Pink,ItemRarity.Blue)&&(item.Value.Desynth>0||NativeGcReward(id)>0);
+            item.Value.GetRarity().EqualsAny(ItemRarity.Green,ItemRarity.Pink,ItemRarity.Blue)&&(item.Value.Desynth>0||AutoGCHandin.CurrentExpertReward(id)>0);
     }
     private static bool DisposalMethodAllows(string action,uint id)=>action=="Discard"?
         cleanup.Active&&cleanup.Phase==CleanupPhase.Discard&&cleanupMethod=="All"&&!Data.GetIMSettings().IMDry&&SurplusDiscardCandidate(id):action is not ("Gc" or "Desynth" or "Vendor")||

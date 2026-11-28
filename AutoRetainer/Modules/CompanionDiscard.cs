@@ -20,16 +20,6 @@ internal static partial class CompanionPolicy
         try{return Svc.PluginInterface.GetIpcSubscriber<ulong,uint,bool>("Steward.InventoryPolicy.SurplusDiscardSelected").InvokeFunc(Svc.ClientState.LocalContentId,id);}
         catch{return false;}
     }
-    private static unsafe int? NativeGcReward(uint id)
-    {
-        var agent=AgentGrandCompanySupply.Instance();
-        if(agent==null||!agent->IsAgentActive()||agent->SelectedTab!=2||agent->NumItems<0||agent->NumItems>1000||
-            agent->NumItems>0&&agent->ItemArray==null)return null;
-        var reward=0;
-        for(var i=0;i<agent->NumItems;i++)
-            if(agent->ItemArray[i].ItemId==id&&agent->ItemArray[i].SealReward>reward)reward=agent->ItemArray[i].SealReward;
-        return reward;
-    }
     internal static unsafe bool SurplusNeedsGcInspection()
     {
         if(!cleanup.Active||cleanupMethod!="All"||!MethodEnabled("Gc"))return false;
@@ -50,12 +40,6 @@ internal static partial class CompanionPolicy
     {
         if(!cleanup.Active||cleanup.Phase!=CleanupPhase.Gc||cleanupMethod!="All")return;
         gcDiscardEvidence.Clear();
-        var agent=AgentGrandCompanySupply.Instance();
-        if(agent==null||!agent->IsAgentActive()||agent->SelectedTab!=2||agent->NumItems!=rows.Count)
-        {
-            Svc.Log.Information("[Steward discard] Expert delivery list could not be verified; no discard evidence recorded");
-            return;
-        }
         var manager=InventoryManager.Instance();if(manager==null)return;
         foreach(var type in Utils.PlayerInvetories)
         {

@@ -1,4 +1,4 @@
-﻿using AutoRetainer.Modules.Voyage;
+using AutoRetainer.Modules.Voyage;
 using AutoRetainer.Scheduler.Handlers;
 using ECommons.ExcelServices;
 using ECommons.GameHelpers;
@@ -7,7 +7,7 @@ namespace AutoRetainer.Scheduler.Tasks;
 
 internal static unsafe class TaskInteractWithNearestBell
 {
-    internal static void Enqueue(bool interact = true)
+    internal static void Enqueue(bool interact = true, bool suppressScheduler = false)
     {
         P.TaskManager.Enqueue(NewYesAlreadyManager.WaitForYesAlreadyDisabledTask);
         P.TaskManager.Enqueue(() =>
@@ -28,7 +28,11 @@ internal static unsafe class TaskInteractWithNearestBell
         P.TaskManager.Enqueue(PlayerWorldHandlers.SelectNearestBell);
         if(interact)
         {
-            P.TaskManager.Enqueue(() => { P.IsInteractionAutomatic = true; }, "Mark interaction as automatic");
+            P.TaskManager.Enqueue(() =>
+            {
+                P.IsInteractionAutomatic = !suppressScheduler;
+                if(suppressScheduler) P.SkipNextEnable = true;
+            }, "Set bell startup behavior");
             P.TaskManager.Enqueue(PlayerWorldHandlers.InteractWithTargetedBell);
         }
     }

@@ -364,15 +364,35 @@ internal static unsafe class AutoGCHandin
 
     private static void CompleteManagedGcInspection(AtkUnitBase* addon)
     {
-        // Only record absence from a ready list whose row count matches the native data.
-        var reader = new ReaderGrandCompanySupplyList(addon);
-        if(IsListReady() && reader.NumItems <= 1000)
+        if(CompanionPolicy.SurplusNeedsGcInspection())
         {
-            var rows = GetHandinItems();
-            if(reader.NumItems == rows.Count)
+            if(TryReadExpertDeliveryList(addon,out var rows,out var failure))
                 CompanionPolicy.ObserveSurplusGcList(rows);
+            else
+                Svc.Log.Information("[Steward discard] Expert delivery list unavailable: {Reason}; no discard evidence recorded",failure);
         }
         CompanionPolicy.CleanupGcCompleted();
+    }
+
+    private static bool TryReadExpertDeliveryList(AtkUnitBase* addon,out List<(uint ItemID,uint Seals)> rows,out string failure)
+    {
+        rows=[];
+        failure="expert tab or inventory filter is not ready";
+        if(!IsReadyToOperate(addon))return false;
+        var count=new ReaderGrandCompanySupplyList(addon).NumItems;
+        failure="invalid expert list count or empty state";
+        if(count>1000||count==0&&!IsDone(addon))return false;
+        rows=GetHandinItems();
+        failure="expert delivery row count or row contents do not match the ready list";
+        return count==rows.Count&&rows.All(row=>row.ItemID!=0&&row.Seals!=0);
+    }
+
+    // Use the same list and filter as GC delivery selection.
+    internal static int? CurrentExpertReward(uint item)
+    {
+        if(!Operation||!TryGetAddonByName<AtkUnitBase>("GrandCompanySupplyList",out var addon)||
+            !TryReadExpertDeliveryList(addon,out var rows,out _))return null;
+        return (int)rows.Where(row=>row.ItemID==item).Select(row=>row.Seals).DefaultIfEmpty().Max();
     }
 
     private static bool IsReadyToOperate(AtkUnitBase* GCSupplyListAddon)
@@ -498,6 +518,7 @@ internal static unsafe class AutoGCHandin
             if(IsListReady())
             {
                 var ptr = (GCExpertEntry*)*(nint*)((nint)(addon) + 648);
+                if(ptr==null)return ret;
                 for(var i = 0; i < reader.NumItems; i++)
                 {
                     var entry = ptr[i];

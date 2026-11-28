@@ -111,8 +111,7 @@ internal static partial class CompanionPolicy
     private static unsafe bool EnqueueOverflow(ulong cid,bool collection=false,bool disposalOnly=false,bool entrustOnly=false)
     {
         if(!Connected(cid)||HasFault||Utils.GetReachableRetainerBell(true)==null||!ECommons.GameHelpers.Player.IsInHomeWorld)return false;
-        P.SkipNextEnable=true;
-        TaskInteractWithNearestBell.Enqueue(true);
+        TaskInteractWithNearestBell.Enqueue(suppressScheduler:true);
         P.TaskManager.Enqueue(()=>TryGetAddonByName<FFXIVClientStructs.FFXIV.Component.GUI.AtkUnitBase>("RetainerList",out var list)&&IsAddonReady(list),"Wait for retainer list");
         P.TaskManager.Enqueue(() =>
         {

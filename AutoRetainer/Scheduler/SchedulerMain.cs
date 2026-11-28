@@ -39,6 +39,11 @@ internal static unsafe class SchedulerMain
 
     internal static bool? EnablePlugin(PluginEnableReason reason)
     {
+        if(Modules.CompanionPolicy.CleanupActive)
+        {
+            DebugLog($"Ignored scheduler enable during Steward cleanup: {reason}");
+            return true;
+        }
         Modules.NormalWorkflow.Begin(reason);
         Reason = reason;
         PluginEnabled = true;

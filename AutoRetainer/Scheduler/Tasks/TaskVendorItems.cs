@@ -1,4 +1,4 @@
-﻿using AutoRetainer.Internal.InventoryManagement;
+using AutoRetainer.Internal.InventoryManagement;
 using AutoRetainer.Scheduler.Handlers;
 using ECommons.GameHelpers;
 using ECommons.UIHelpers.AddonMasterImplementations;
@@ -17,9 +17,8 @@ public unsafe static class TaskVendorItems
         }
         else if(HasVendorableItems() && Data.GetIMSettings().IMEnableAutoVendor && Utils.GetReachableRetainerBell(true) != null && Player.IsInHomeWorld && Data.RetainerData.Count > 0)
         {
-            P.SkipNextEnable = true;
             P.TaskManager.Enqueue(() => !IsOccupied());
-            TaskInteractWithNearestBell.Enqueue(true);
+            TaskInteractWithNearestBell.Enqueue(suppressScheduler:true);
             P.TaskManager.Enqueue(() => TryGetAddonMaster<AddonMaster.RetainerList>(out var m) && m.IsAddonReady);
             P.TaskManager.Enqueue(() =>
             {

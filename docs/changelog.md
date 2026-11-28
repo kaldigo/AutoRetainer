@@ -1,3 +1,7 @@
+## Cleanup bell and expert delivery evidence
+
+Keep the normal scheduler idle throughout managed cleanup, including vendor visits and later withdrawal batches. Use the validated Expert Delivery list for both hand-in eligibility and surplus seal checks. Missing or inconsistent rows still hold discard and log the reason.
+
 ## Steward cleanup fixes
 
 Record expert-delivery evidence on either successful completion path before closing the list. Steward-managed cleanup can process approved stacks above the ordinary hard vendor stack cutoff. Exact source checks, protection, Demo mode and final companion approval still apply.

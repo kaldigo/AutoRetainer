@@ -9,7 +9,22 @@ class DisposalBoundary(unittest.TestCase):
   self.assertIn('CleanupGcCompleted(true)',handler)
   finish=source.split('private static void CompleteManagedGcInspection')[1].split('private static bool IsReadyToOperate')[0]
   self.assertLess(finish.index('ObserveSurplusGcList(rows)'),finish.index('CleanupGcCompleted()'))
-  self.assertIn('reader.NumItems == rows.Count',finish)
+  self.assertIn('TryReadExpertDeliveryList(addon,out var rows,out var failure)',finish)
+  self.assertIn('count==rows.Count&&rows.All(row=>row.ItemID!=0&&row.Seals!=0)',finish)
+  self.assertIn('count==0&&!IsDone(addon)',finish)
+  self.assertNotIn('AgentGrandCompanySupply', (ROOT/'Modules/CompanionDiscard.cs').read_text())
+
+ def test_cleanup_bell_open_cannot_enable_normal_scheduler(self):
+  interaction=(ROOT/'Scheduler/Tasks/TaskInteractWithNearestBell.cs').read_text()
+  self.assertIn('P.IsInteractionAutomatic = !suppressScheduler;',interaction)
+  for path in ['Modules/CompanionStorage.cs','Scheduler/Tasks/TaskVendorItems.cs']:
+   self.assertIn('TaskInteractWithNearestBell.Enqueue(suppressScheduler:true);',(ROOT/path).read_text())
+  entry=(ROOT/'AutoRetainer.cs').read_text(encoding='utf-8-sig')
+  suppression=entry.split('if(CompanionPolicy.CleanupActive || SkipNextEnable)')[1].split('if(!SkipNextEnable)')[0]
+  self.assertIn('IsInteractionAutomatic = false;',suppression)
+  self.assertIn('return;',suppression)
+  scheduler=(ROOT/'Scheduler/SchedulerMain.cs').read_text().split('internal static bool? EnablePlugin')[1]
+  self.assertLess(scheduler.index('CompanionPolicy.CleanupActive'),scheduler.index('NormalWorkflow.Begin'))
 
  def test_final_policy_checks_disposal_method(self):
   source=(ROOT/'Modules/CompanionPolicy.cs').read_text()
